@@ -1,0 +1,24 @@
+canisters:
+  - name: nnx_frontend
+    build:
+      steps:
+        - type: script
+          commands:
+            - ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
+
+networks:
+  - name: local
+    mode: managed
+    gateway:
+      bind: 127.0.0.1
+      port: 4943
+
+environments:
+  - name: local
+    network: local
+    canisters:
+      - nnx_frontend
+  - name: ic
+    network: ic
+    canisters:
+      - nnx_frontend

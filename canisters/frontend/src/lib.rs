@@ -1,0 +1,676 @@
+use ic_asset_certification::{
+    Asset, AssetCertificationError, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter,
+};
+use ic_cdk::{api::data_certificate, init, post_upgrade, query};
+use ic_http_certification::{
+    utils::add_v2_certificate_header, DefaultCelBuilder, DefaultResponseCertification, HeaderField,
+    HttpCertification, HttpCertificationPath, HttpCertificationTree, HttpCertificationTreeEntry,
+    HttpRequest, HttpResponse, Method, StatusCode, CERTIFICATE_EXPRESSION_HEADER_NAME,
+};
+use include_dir::{include_dir, Dir};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+thread_local! {
+    static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
+    static ASSET_ROUTER: RefCell<AssetRouter<'static>> = RefCell::new(
+        AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone()))
+    );
+    static HEAD_ASSETS: RefCell<HashMap<HeadAssetKey, CertifiedHeadAsset>> = RefCell::new(HashMap::new());
+}
+
+static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/public");
+
+const PRIVATE_BUILD_MANIFEST_PATH: &str = "generated/frontend-bundle.json";
+const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
+const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct HeadAssetKey {
+    path: String,
+    match_kind: HeadAssetMatchKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum HeadAssetMatchKind {
+    Exact,
+    Fallback,
+}
+
+#[derive(Debug, Clone)]
+struct CertifiedHeadAsset {
+    response: HttpResponse<'static>,
+    tree_entry: HttpCertificationTreeEntry<'static>,
+}
+
+#[init]
+fn init() {
+    initialize_runtime_state();
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    initialize_runtime_state();
+}
+
+fn initialize_runtime_state() {
+    certify_all_assets();
+}
+
+#[query]
+fn http_request(req: HttpRequest) -> HttpResponse<'static> {
+    if req.get_path().is_err() {
+        return plain_error_response(StatusCode::BAD_REQUEST, "bad request path");
+    }
+
+    let Some(certificate) = data_certificate() else {
+        return plain_error_response(StatusCode::INTERNAL_SERVER_ERROR, "certificate unavailable");
+    };
+    serve_asset_with_certificate(&certificate, &req)
+}
+
+fn collect_assets<'content, 'path>(
+    dir: &'content Dir<'path>,
+    assets: &mut Vec<Asset<'content, 'path>>,
+) {
+    for file in dir.files() {
+        let path = file.path().to_string_lossy();
+        if path != PRIVATE_BUILD_MANIFEST_PATH {
+            assets.push(Asset::new(path, file.contents()));
+        }
+    }
+
+    for dir in dir.dirs() {
+        collect_assets(dir, assets);
+    }
+}
+
+#[cfg(not(test))]
+fn update_certified_data(root_hash: &[u8]) {
+    ic_cdk::api::certified_data_set(root_hash);
+}
+
+#[cfg(test)]
+fn update_certified_data(root_hash: &[u8]) {
+    let _ = root_hash;
+}
+
+fn certify_all_assets() {
+    let compressed_encodings = vec![
+        AssetEncoding::Brotli.default_config(),
+        AssetEncoding::Gzip.default_config(),
+    ];
+    let mut asset_configs = vec![
+        AssetConfig::File {
+            path: "index.html".to_string(),
+            content_type: Some("text/html".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![AssetFallbackConfig {
+                scope: "/neuron/".to_string(),
+                status_code: Some(StatusCode::OK),
+            }],
+            aliased_by: vec![],
+            encodings: compressed_encodings.clone(),
+        },
+        AssetConfig::File {
+            path: "404.html".to_string(),
+            content_type: Some("text/html".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![AssetFallbackConfig {
+                scope: "/".to_string(),
+                status_code: Some(StatusCode::NOT_FOUND),
+            }],
+            aliased_by: vec!["/404".to_string(), "/404.html".to_string()],
+            encodings: compressed_encodings.clone(),
+        },
+        AssetConfig::File {
+            path: ".well-known/ic-domains".to_string(),
+            content_type: Some("text/plain".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![],
+        },
+        AssetConfig::File {
+            path: "base.css".to_string(),
+            content_type: Some("text/css".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
+        AssetConfig::Pattern {
+            pattern: "**/*.css".to_string(),
+            content_type: Some("text/css".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
+    ];
+
+    let mut assets = Vec::new();
+    collect_assets(&ASSETS_DIR, &mut assets);
+
+    if let Some(generated_dir) = ASSETS_DIR.get_dir("generated") {
+        for file in generated_dir.files() {
+            let path = file.path().to_string_lossy();
+            if !path.starts_with("generated/app.") || !path.ends_with(".js") {
+                continue;
+            }
+            asset_configs.push(AssetConfig::File {
+                path: path.to_string(),
+                content_type: Some("text/javascript".to_string()),
+                headers: asset_headers("same-origin", IMMUTABLE_ASSET_CACHE_CONTROL),
+                fallback_for: vec![],
+                aliased_by: vec![],
+                encodings: compressed_encodings.clone(),
+            });
+        }
+    }
+
+    ASSET_ROUTER.with_borrow_mut(|asset_router| {
+        if let Err(err) = asset_router.certify_assets(assets, asset_configs) {
+            ic_cdk::trap(format!("failed to certify frontend assets: {err}"));
+        }
+        update_certified_data(&asset_router.root_hash());
+    });
+
+    if let Err(err) = certify_head_assets(&ASSETS_DIR) {
+        ic_cdk::trap(format!("failed to certify frontend HEAD assets: {err}"));
+    }
+
+    HTTP_TREE.with(|tree| update_certified_data(&tree.borrow().root_hash()));
+}
+
+fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
+    let mut head_assets = HashMap::new();
+    let index = dir
+        .get_file("index.html")
+        .ok_or_else(|| "index.html is missing from frontend assets".to_string())?;
+    let not_found = dir
+        .get_file("404.html")
+        .ok_or_else(|| "404.html is missing from frontend assets".to_string())?;
+    let base_css = dir
+        .get_file("base.css")
+        .ok_or_else(|| "base.css is missing from frontend assets".to_string())?;
+    let ic_domains = dir
+        .get_file(".well-known/ic-domains")
+        .ok_or_else(|| ".well-known/ic-domains is missing from frontend assets".to_string())?;
+
+    insert_head_asset(
+        &mut head_assets,
+        "/neuron/",
+        StatusCode::OK,
+        headers_for_path("index.html", index.contents().len()),
+        HeadAssetMatchKind::Fallback,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/base.css",
+        StatusCode::OK,
+        headers_for_path("base.css", base_css.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/.well-known/ic-domains",
+        StatusCode::OK,
+        headers_for_path(".well-known/ic-domains", ic_domains.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/404",
+        StatusCode::OK,
+        headers_for_path("404.html", not_found.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/404.html",
+        StatusCode::OK,
+        headers_for_path("404.html", not_found.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+
+    if let Some(generated_dir) = dir.get_dir("generated") {
+        for file in generated_dir.files() {
+            let path = file.path().to_string_lossy();
+            if path.starts_with("generated/app.") && path.ends_with(".js") {
+                insert_head_asset(
+                    &mut head_assets,
+                    &format!("/{path}"),
+                    StatusCode::OK,
+                    headers_for_path(&path, file.contents().len()),
+                    HeadAssetMatchKind::Exact,
+                )?;
+            }
+        }
+    }
+
+    insert_head_asset(
+        &mut head_assets,
+        "/",
+        StatusCode::NOT_FOUND,
+        headers_for_path("404.html", not_found.contents().len()),
+        HeadAssetMatchKind::Fallback,
+    )?;
+
+    HEAD_ASSETS.with(|stored| *stored.borrow_mut() = head_assets);
+    Ok(())
+}
+
+fn insert_head_asset(
+    head_assets: &mut HashMap<HeadAssetKey, CertifiedHeadAsset>,
+    path: &str,
+    status_code: StatusCode,
+    headers: Vec<HeaderField>,
+    match_kind: HeadAssetMatchKind,
+) -> Result<(), String> {
+    let response = HttpResponse::builder()
+        .with_status_code(status_code)
+        .with_body(Vec::new())
+        .with_headers(headers)
+        .build();
+    let request = HttpRequest::builder()
+        .with_method(Method::HEAD)
+        .with_url(path)
+        .build();
+    let cel_expr = DefaultCelBuilder::full_certification()
+        .with_response_certification(DefaultResponseCertification::response_header_exclusions(
+            vec![],
+        ))
+        .build();
+    let certification = HttpCertification::full(&cel_expr, &request, &response, None)
+        .map_err(|err| err.to_string())?;
+    let certification_path = match match_kind {
+        HeadAssetMatchKind::Exact => HttpCertificationPath::exact(path.to_string()),
+        HeadAssetMatchKind::Fallback => HttpCertificationPath::wildcard(path.to_string()),
+    };
+    let tree_entry = HttpCertificationTreeEntry::new(certification_path, certification);
+
+    HTTP_TREE.with(|tree| tree.borrow_mut().insert(&tree_entry));
+    head_assets.insert(
+        HeadAssetKey {
+            path: path.to_string(),
+            match_kind,
+        },
+        CertifiedHeadAsset {
+            response,
+            tree_entry,
+        },
+    );
+    Ok(())
+}
+
+fn serve_asset_with_certificate(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
+    let path = match req.get_path() {
+        Ok(path) => path,
+        Err(err) => return asset_error_response(&AssetCertificationError::from(err)),
+    };
+
+    if !is_public_route(&path) {
+        return not_found_response(certificate, req);
+    }
+
+    if req.method() == Method::HEAD {
+        return serve_head_asset(certificate, req);
+    }
+
+    ASSET_ROUTER.with_borrow(
+        |asset_router| match asset_router.serve_asset(certificate, req) {
+            Ok(response) => response,
+            Err(err) => asset_error_response(&err),
+        },
+    )
+}
+
+fn serve_head_asset(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
+    let path = match req.get_path() {
+        Ok(path) => path,
+        Err(err) => return asset_error_response(&AssetCertificationError::from(err)),
+    };
+
+    HEAD_ASSETS.with_borrow(
+        |head_assets| match find_head_asset(head_assets, &path).cloned() {
+            Some(mut asset) => {
+                let witness = HTTP_TREE.with(|tree| {
+                    tree.borrow()
+                        .witness(&asset.tree_entry, &path)
+                        .map_err(AssetCertificationError::from)
+                });
+                match witness {
+                    Ok(witness) => {
+                        add_v2_certificate_header(
+                            certificate,
+                            &mut asset.response,
+                            &witness,
+                            &asset.tree_entry.path.to_expr_path(),
+                        );
+                        asset.response
+                    }
+                    Err(err) => asset_error_response(&err),
+                }
+            }
+            None => not_found_response(certificate, req),
+        },
+    )
+}
+
+fn find_head_asset<'a>(
+    head_assets: &'a HashMap<HeadAssetKey, CertifiedHeadAsset>,
+    path: &str,
+) -> Option<&'a CertifiedHeadAsset> {
+    if let Some(asset) = head_assets.get(&HeadAssetKey {
+        path: path.to_string(),
+        match_kind: HeadAssetMatchKind::Exact,
+    }) {
+        return Some(asset);
+    }
+
+    let mut scopes = path.split('/').collect::<Vec<_>>();
+    scopes.pop();
+    while !scopes.is_empty() {
+        let mut scope = scopes.join("/");
+        scope.push('/');
+        if let Some(asset) = head_assets.get(&HeadAssetKey {
+            path: scope.clone(),
+            match_kind: HeadAssetMatchKind::Fallback,
+        }) {
+            return Some(asset);
+        }
+        if let Some(asset) = head_assets.get(&HeadAssetKey {
+            path: scope.trim_end_matches('/').to_string(),
+            match_kind: HeadAssetMatchKind::Fallback,
+        }) {
+            return Some(asset);
+        }
+        scopes.pop();
+    }
+    None
+}
+
+fn is_public_route(path: &str) -> bool {
+    if path == "/generated/frontend-bundle.json" {
+        return false;
+    }
+    if path == "/" || path == "/missing" {
+        return true;
+    }
+    if path == "/base.css" || path == "/404" || path == "/404.html" {
+        return true;
+    }
+    if path == "/.well-known/ic-domains" {
+        return true;
+    }
+    if path.starts_with("/generated/app.") && path.ends_with(".js") {
+        return true;
+    }
+    is_valid_neuron_route(path)
+}
+
+fn is_valid_neuron_route(path: &str) -> bool {
+    let Some(id) = path.strip_prefix("/neuron/") else {
+        return false;
+    };
+    if id.is_empty() || id.contains('/') || !id.bytes().all(|byte| byte.is_ascii_digit()) {
+        return false;
+    }
+    id.parse::<u64>().is_ok()
+}
+
+fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
+    if req.method() == Method::HEAD {
+        let fallback_req = HttpRequest::builder()
+            .with_method(Method::HEAD)
+            .with_url("/")
+            .build();
+        return serve_head_asset(certificate, &fallback_req);
+    }
+
+    let fallback_req = HttpRequest::get("/missing").build();
+    ASSET_ROUTER.with_borrow(|asset_router| {
+        match asset_router.serve_asset(certificate, &fallback_req) {
+            Ok(response) => response,
+            Err(err) => asset_error_response(&err),
+        }
+    })
+}
+
+fn asset_error_response(err: &AssetCertificationError) -> HttpResponse<'static> {
+    match err {
+        AssetCertificationError::NoAssetMatchingRequestUrl { .. } => {
+            plain_error_response(StatusCode::NOT_FOUND, "not found")
+        }
+        _ => plain_error_response(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "failed to serve frontend asset",
+        ),
+    }
+}
+
+fn plain_error_response(status: StatusCode, message: &str) -> HttpResponse<'static> {
+    HttpResponse::builder()
+        .with_status_code(status)
+        .with_body(message.as_bytes().to_vec())
+        .with_headers({
+            let mut headers = asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL);
+            headers.push((
+                "content-type".to_string(),
+                "text/plain; charset=utf-8".to_string(),
+            ));
+            headers
+        })
+        .build()
+}
+
+fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
+    let mut headers = asset_headers(
+        "same-origin",
+        if path == "index.html"
+            || path == "404.html"
+            || path == "base.css"
+            || path == ".well-known/ic-domains"
+        {
+            NO_CACHE_ASSET_CACHE_CONTROL
+        } else {
+            IMMUTABLE_ASSET_CACHE_CONTROL
+        },
+    );
+    headers.push(("content-length".to_string(), content_length.to_string()));
+    headers.push((
+        "content-type".to_string(),
+        match path {
+            "index.html" | "404.html" => "text/html",
+            ".well-known/ic-domains" => "text/plain",
+            _ if path.ends_with(".js") => "text/javascript",
+            _ if path.ends_with(".css") => "text/css",
+            _ => "application/octet-stream",
+        }
+        .to_string(),
+    ));
+    headers.push((
+        CERTIFICATE_EXPRESSION_HEADER_NAME.to_string(),
+        DefaultCelBuilder::full_certification()
+            .with_response_certification(DefaultResponseCertification::response_header_exclusions(
+                vec![],
+            ))
+            .build()
+            .to_string(),
+    ));
+    headers
+}
+
+fn asset_headers(corp: &str, cache_control: &str) -> Vec<HeaderField> {
+    vec![
+        (
+            "strict-transport-security".to_string(),
+            "max-age=31536000; includeSubDomains".to_string(),
+        ),
+        ("x-content-type-options".to_string(), "nosniff".to_string()),
+        (
+            "content-security-policy".to_string(),
+            "default-src 'self'; connect-src 'self' https://icp0.io https://*.icp0.io; base-uri 'self'; script-src 'self'; img-src 'self' data:; style-src 'self'; style-src-attr 'none'; worker-src 'none'; child-src 'none'; frame-src 'none'; manifest-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'self'; upgrade-insecure-requests".to_string(),
+        ),
+        ("referrer-policy".to_string(), "no-referrer".to_string()),
+        (
+            "permissions-policy".to_string(),
+            "accelerometer=(),autoplay=(),camera=(),display-capture=(),geolocation=(),gyroscope=(),magnetometer=(),microphone=(),midi=(),payment=(),picture-in-picture=(),publickey-credentials-get=(),screen-wake-lock=(),usb=(),web-share=(),xr-spatial-tracking=()".to_string(),
+        ),
+        (
+            "cross-origin-embedder-policy".to_string(),
+            "require-corp".to_string(),
+        ),
+        (
+            "cross-origin-opener-policy".to_string(),
+            "same-origin".to_string(),
+        ),
+        (
+            "cross-origin-resource-policy".to_string(),
+            corp.to_string(),
+        ),
+        ("cache-control".to_string(), cache_control.to_string()),
+    ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn header_value<'a>(response: &'a HttpResponse<'static>, name: &str) -> Option<&'a str> {
+        response
+            .headers()
+            .iter()
+            .find(|(header, _)| header.eq_ignore_ascii_case(name))
+            .map(|(_, value)| value.as_str())
+    }
+
+    fn get(path: &str) -> HttpResponse<'static> {
+        certify_all_assets();
+        serve_asset_with_certificate(b"test-certificate", &HttpRequest::get(path).build())
+    }
+
+    fn head(path: &str) -> HttpResponse<'static> {
+        certify_all_assets();
+        serve_asset_with_certificate(
+            b"test-certificate",
+            &HttpRequest::builder()
+                .with_method(Method::HEAD)
+                .with_url(path)
+                .build(),
+        )
+    }
+
+    fn generated_app_path() -> Option<String> {
+        ASSETS_DIR.get_dir("generated").and_then(|generated_dir| {
+            generated_dir.files().find_map(|file| {
+                let path = file.path().to_string_lossy();
+                (path.starts_with("generated/app.") && path.ends_with(".js"))
+                    .then(|| format!("/{path}"))
+            })
+        })
+    }
+
+    #[test]
+    fn neuron_route_returns_index_with_200() {
+        let response = get("/neuron/2947465672511369");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn malformed_neuron_route_returns_404() {
+        assert_eq!(
+            get("/neuron/not-a-number").status_code(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get("/neuron/123/extra").status_code(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn root_and_missing_return_404() {
+        assert_eq!(get("/").status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(get("/missing").status_code(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn generated_manifest_is_not_served() {
+        assert_eq!(
+            get("/generated/frontend-bundle.json").status_code(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn generated_js_uses_immutable_cache_headers() {
+        let Some(js_path) = generated_app_path() else {
+            return;
+        };
+        certify_all_assets();
+        let response =
+            serve_asset_with_certificate(b"test-certificate", &HttpRequest::get(js_path).build());
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(IMMUTABLE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn index_and_404_use_no_cache_headers() {
+        let index = get("/neuron/1");
+        assert_eq!(
+            header_value(&index, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+        let not_found = get("/");
+        assert_eq!(
+            header_value(&not_found, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn head_base_css_is_exactly_certified() {
+        let response = head("/base.css");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(header_value(&response, "content-type"), Some("text/css"));
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn head_ic_domains_is_exactly_certified() {
+        let response = head("/.well-known/ic-domains");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(header_value(&response, "content-type"), Some("text/plain"));
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn head_generated_js_is_exactly_certified_when_built() {
+        let Some(js_path) = generated_app_path() else {
+            return;
+        };
+        let response = head(&js_path);
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("text/javascript")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(IMMUTABLE_ASSET_CACHE_CONTROL)
+        );
+    }
+}

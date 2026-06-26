@@ -1,0 +1,17 @@
+{
+  "name": "network-nexus",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate:nns-topics": "node tools/scripts/generate-nns-topics.mjs",
+    "build:frontend": "npm run generate:nns-topics && node canisters/frontend/web/build-frontend.mjs",
+    "setup:frontend": "npm ci --no-fund --no-audit",
+    "test:frontend-unit": "node --test canisters/frontend/web/test/*.test.mjs"
+  },
+  "dependencies": {
+    "@icp-sdk/core": "5.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.27.4"
+  }
+}

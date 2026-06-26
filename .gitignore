@@ -23,6 +23,7 @@ dist/
 # Generated frontend build artifacts
 canisters/frontend/public/generated/*
 !canisters/frontend/public/generated/.gitkeep
+release-artifacts/
 
 # Generated declarations are normally ignored, but checked-in frontend external declarations are kept.
 **/declarations/

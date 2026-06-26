@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [[ $# -ne 2 ]]; then
+  echo "usage: $0 <rust-package-name> <icp-canister-name>" >&2
+  exit 2
+fi
+
+package_name="$1"
+canister_name="$2"
+
+if [[ -z "${ICP_WASM_OUTPUT_PATH:-}" ]]; then
+  echo "ICP_WASM_OUTPUT_PATH is required by icp-cli custom build steps" >&2
+  exit 1
+fi
+
+npm run build:frontend
+cargo build --package "$package_name" --target wasm32-unknown-unknown --release
+
+wasm_name="${package_name//-/_}.wasm"
+source_wasm="target/wasm32-unknown-unknown/release/${wasm_name}"
+
+mkdir -p "$(dirname "$ICP_WASM_OUTPUT_PATH")"
+cp "$source_wasm" "$ICP_WASM_OUTPUT_PATH"
+
+if command -v ic-wasm >/dev/null 2>&1; then
+  ic-wasm "$ICP_WASM_OUTPUT_PATH" -o "$ICP_WASM_OUTPUT_PATH" shrink
+fi
+
+gzip -nf "$ICP_WASM_OUTPUT_PATH"
+mv "${ICP_WASM_OUTPUT_PATH}.gz" "$ICP_WASM_OUTPUT_PATH"
+
+echo "Built $canister_name from package $package_name at $ICP_WASM_OUTPUT_PATH"
