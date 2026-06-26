@@ -1,0 +1,34 @@
+# Editors
+.vscode/
+.idea/
+**/*~
+
+# OS files
+.DS_Store
+**/.DS_Store
+
+# icp-cli local network/cache state
+.icp/cache/
+
+# Rust
+target/
+
+# JavaScript
+node_modules/
+dist/
+
+# Environment variables
+.env
+
+# Generated frontend build artifacts
+canisters/frontend/public/generated/*
+!canisters/frontend/public/generated/.gitkeep
+
+# Generated declarations are normally ignored, but checked-in frontend external declarations are kept.
+**/declarations/
+!canisters/frontend/web/declarations/
+!canisters/frontend/web/declarations/**
+
+# Python/cache
+__pycache__/
+*.pyc
