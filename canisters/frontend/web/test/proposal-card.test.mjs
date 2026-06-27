@@ -81,7 +81,7 @@ function proposalWithTally(tally) {
   };
 }
 
-test('proposal card vote bar uses yes/no vote split without uncast power', () => withTestDocument(() => {
+test('proposal card vote bar includes uncast voting power', () => withTestDocument(() => {
   const card = renderProposalCard(proposalWithTally({
     yes: 25n,
     no: 75n,
@@ -97,14 +97,15 @@ test('proposal card vote bar uses yes/no vote split without uncast power', () =>
 
   const bar = card.querySelector('.vote-split-bar');
   const yes = bar.querySelector('.vote-split-yes');
+  const uncast = bar.querySelector('.vote-split-uncast');
   const no = bar.querySelector('.vote-split-no');
 
-  assert.equal(yes.style.width, '25%');
-  assert.equal(no.style.width, '75%');
-  assert.equal(bar.querySelector('.vote-split-uncast'), null);
+  assert.equal(yes.style.width, '2.5%');
+  assert.equal(uncast.style.width, '90%');
+  assert.equal(no.style.width, '7.5%');
   assert.deepEqual(
     bar.children.map((child) => child.className),
-    ['vote-split-yes', 'vote-split-no'],
+    ['vote-split-yes', 'vote-split-uncast', 'vote-split-no'],
   );
 }));
 
@@ -123,7 +124,7 @@ test('proposal card vote bar shows empty state when no yes/no votes are recorded
   }));
 
   assert.equal(card.querySelector('.vote-split-yes').style.width, '0%');
+  assert.equal(card.querySelector('.vote-split-uncast').style.width, '100%');
   assert.equal(card.querySelector('.vote-split-no').style.width, '0%');
-  assert.equal(card.querySelector('.vote-split-uncast'), null);
   assert.match(card.getTextContent(), /No votes recorded yet/);
 }));

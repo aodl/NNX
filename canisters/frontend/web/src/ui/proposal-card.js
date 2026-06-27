@@ -1,6 +1,7 @@
 import {
   formatTimeRemaining,
 } from '../app/view-formatters.js';
+import { percentWidth, renderVotePowerBar } from './vote-bar.js';
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -32,10 +33,6 @@ function icon(name) {
   return svg;
 }
 
-function percentWidth(value) {
-  return `${Math.max(0, Math.min(100, Number(value ?? 0)))}%`;
-}
-
 function renderVoteSplit(tally) {
   const wrap = document.createElement('div');
   wrap.className = 'vote-split';
@@ -53,15 +50,7 @@ function renderVoteSplit(tally) {
     return wrap;
   }
 
-  const bar = document.createElement('div');
-  bar.className = 'vote-split-bar';
-  const yes = document.createElement('span');
-  yes.className = 'vote-split-yes';
-  yes.style.width = percentWidth(tally.yesVotePercent);
-  const no = document.createElement('span');
-  no.className = 'vote-split-no';
-  no.style.width = percentWidth(tally.noVotePercent);
-  bar.append(yes, no);
+  const bar = renderVotePowerBar(tally);
 
   if (tally.votedYesNoTotal === 0n) {
     const empty = document.createElement('div');

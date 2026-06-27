@@ -4,6 +4,7 @@ import {
   formatTimestampSeconds,
 } from '../app/view-formatters.js';
 import { renderNotFoundPage } from './not-found-page.js';
+import { percentWidth, renderVotePowerBar } from './vote-bar.js';
 
 function clear(root) {
   root.className = 'shell';
@@ -75,10 +76,6 @@ function icon(name) {
   }
 
   return svg;
-}
-
-function percentWidth(value) {
-  return `${Math.max(0, Math.min(100, Number(value ?? 0)))}%`;
 }
 
 function externalLink(url) {
@@ -184,18 +181,7 @@ function renderVotingVisual(tally) {
     return visualSection('Voting Power', 'scales', body);
   }
 
-  const bar = document.createElement('div');
-  bar.className = 'vote-split-bar proposal-detail-vote-bar';
-  const yes = document.createElement('span');
-  yes.className = 'vote-split-yes';
-  yes.style.width = percentWidth(tally.yesPercent);
-  const uncast = document.createElement('span');
-  uncast.className = 'vote-split-uncast';
-  uncast.style.width = percentWidth(tally.uncastPercent);
-  const no = document.createElement('span');
-  no.className = 'vote-split-no';
-  no.style.width = percentWidth(tally.noPercent);
-  bar.append(yes, uncast, no);
+  const bar = renderVotePowerBar(tally, { className: 'proposal-detail-vote-bar' });
 
   const labels = document.createElement('div');
   labels.className = 'proposal-vote-labels';
