@@ -1,4 +1,6 @@
-export const GOVERNANCE_CANISTER_ID = 'rrkah-fqaaa-aaaaa-aaaaq-cai';
+export const NNS_GOVERNANCE_CANISTER_ID = 'rrkah-fqaaa-aaaaa-aaaaq-cai';
+export const NNS_REGISTRY_CANISTER_ID = 'rwlgt-iiaaa-aaaaa-aaaaa-cai';
+export const GOVERNANCE_CANISTER_ID = NNS_GOVERNANCE_CANISTER_ID;
 
 export const GUARANTEE_ANCHOR_NEURONS = Object.freeze({
   alphaVote: 2947465672511369n,

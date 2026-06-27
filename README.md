@@ -2,7 +2,7 @@
 
 Network Nexus is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
-The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on, and `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance directly through the query facade.
+The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on, and `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance and Registry through the query facade.
 
 ## Tooling
 
@@ -44,7 +44,57 @@ The landing page reads NNS Governance `get_pending_proposals` as the source of t
 
 Application and UI modules do not import actors, agents, or Candid declarations directly. They depend on `createIcQueryFacade`.
 
-The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and the checked-in NNS Governance declarations to call `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
+The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and checked-in reduced NNS Governance and Registry declarations. It calls Governance `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info`, plus Registry topology queries. A future `ic-query` backend can replace this module without changing UI or domain call sites.
+
+Mainnet canister IDs:
+
+```text
+NNS Governance  rrkah-fqaaa-aaaaa-aaaaq-cai
+NNS Registry    rwlgt-iiaaa-aaaaa-aaaaa-cai
+```
+
+## Onchain Data Proxy
+
+The first NNX onchain data proxy lives behind `createIcQueryFacade` and returns normalized plain JavaScript objects. UI and domain code should call facade methods only:
+
+```js
+const topology = await queryFacade.getIcTopology();
+const providers = await queryFacade.getIcNodeProviders();
+await queryFacade.refreshIcTopology();
+queryFacade.clearTopologyCache();
+```
+
+`getIcTopology()` uses Candid-safe reads:
+
+1. Governance `list_node_providers()`.
+2. Registry `get_node_operators_and_dcs_of_node_provider(providerPrincipal)` for each provider.
+3. Normalization into node providers, node operators, and data centers.
+
+Complete subnet and node discovery is not guaranteed in this Candid-safe mode. The Registry declaration includes `get_subnet` and `get_subnet_for_canister` for known-ID reads, but this PR intentionally does not invent a method for listing every subnet and does not decode raw Registry protobuf key/value records. `raw-registry-client.js` is an isolated placeholder that throws `RAW_REGISTRY_UNAVAILABLE` until a later raw Registry implementation or backend/indexer is added.
+
+Topology cache behavior:
+
+- In-memory only, no `localStorage`.
+- Default TTL is 60 seconds.
+- Concurrent `getIcTopology()` calls share the same in-flight request.
+- `refreshIcTopology()` bypasses the cache.
+- `clearTopologyCache()` invalidates cached and in-flight topology state.
+
+Topology errors use `IcTopologyError` with stable codes such as `GOVERNANCE_CALL_FAILED`, `REGISTRY_CALL_FAILED`, `REGISTRY_RESPONSE_ERR`, `PARTIAL_TOPOLOGY`, `VALIDATION_FAILED`, and `RAW_REGISTRY_UNAVAILABLE`. A total provider read failure throws an `IcTopologyError`; partial provider failures return a partial topology with structured warnings.
+
+Node location modeling must be derived through the topology relationship, not as direct node fields:
+
+```text
+node -> node operator -> data center -> gps
+```
+
+Normal test commands:
+
+```bash
+npm run test:frontend-unit
+cargo test --workspace
+npm run build:frontend
+```
 
 ## NNS Topic Generation
 

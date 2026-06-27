@@ -4,5 +4,9 @@ export function createIcQueryFacade({ backend }) {
     getNnsNeurons: ({ neuronIds }) => backend.getNnsNeurons({ neuronIds }),
     getOpenNnsProposals: () => backend.getOpenNnsProposals(),
     getNnsProposal: ({ proposalId }) => backend.getNnsProposal({ proposalId }),
+    getIcNodeProviders: () => backend.getIcNodeProviders(),
+    getIcTopology: (options) => backend.getIcTopology(options),
+    clearTopologyCache: () => backend.clearTopologyCache(),
+    refreshIcTopology: () => backend.refreshIcTopology(),
   });
 }

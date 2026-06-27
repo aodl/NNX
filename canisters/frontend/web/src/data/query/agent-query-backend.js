@@ -1,6 +1,12 @@
 import { HttpAgent } from '@icp-sdk/core/agent';
 import { createActor as createGovernanceActor } from '../../../declarations/nns_governance/index.js';
-import { GOVERNANCE_CANISTER_ID } from '../../app/config.js';
+import { createActor as createRegistryActor } from '../../../declarations/nns_registry/index.js';
+import {
+  NNS_GOVERNANCE_CANISTER_ID,
+  NNS_REGISTRY_CANISTER_ID,
+} from '../../app/config.js';
+import { createTopologyService } from '../topology/topology-service.js';
+import { IcTopologyError, TOPOLOGY_ERROR_CODES } from '../topology/topology-errors.js';
 import {
   normalizeKnownNeuronNamesResponse,
   normalizeNeuronListResponse,
@@ -13,17 +19,44 @@ export function getPendingProposalsRequestOpt() {
   return [{ return_self_describing_action: [false] }];
 }
 
-export async function createAgentQueryBackend({ host, local } = {}) {
-  const agent = await HttpAgent.create({
-    host,
-    verifyQuerySignatures: true,
-  });
+export async function createAgentQueryBackend({
+  host,
+  local,
+  governanceCanisterId = NNS_GOVERNANCE_CANISTER_ID,
+  registryCanisterId = NNS_REGISTRY_CANISTER_ID,
+} = {}) {
+  let agent;
+  try {
+    agent = await HttpAgent.create({
+      host,
+      verifyQuerySignatures: true,
+    });
 
-  if (local) {
-    await agent.fetchRootKey();
+    if (local) {
+      await agent.fetchRootKey();
+    }
+  } catch (error) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.AGENT_INIT_FAILED,
+      'Failed to initialize the IC query agent.',
+      error,
+    );
   }
 
-  const governance = createGovernanceActor(GOVERNANCE_CANISTER_ID, { agent });
+  let governance;
+  let registry;
+  try {
+    governance = createGovernanceActor(governanceCanisterId, { agent });
+    registry = createRegistryActor(registryCanisterId, { agent });
+  } catch (error) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.ACTOR_INIT_FAILED,
+      'Failed to initialize NNS query actors.',
+      error,
+    );
+  }
+
+  const topologyService = createTopologyService({ governance, registry });
   let knownNeuronNames = new Map();
   let knownNeuronFetchedAt = 0;
   let knownNeuronRefresh = null;
@@ -87,5 +120,14 @@ export async function createAgentQueryBackend({ host, local } = {}) {
     return proposalInfo ? normalizeOpenProposalListResponse([proposalInfo], names)[0] : null;
   }
 
-  return Object.freeze({ getNnsNeuron, getNnsNeurons, getOpenNnsProposals, getNnsProposal });
+  return Object.freeze({
+    getNnsNeuron,
+    getNnsNeurons,
+    getOpenNnsProposals,
+    getNnsProposal,
+    getIcNodeProviders: topologyService.getIcNodeProviders,
+    getIcTopology: topologyService.getIcTopology,
+    refreshIcTopology: topologyService.refreshIcTopology,
+    clearTopologyCache: topologyService.clearTopologyCache,
+  });
 }

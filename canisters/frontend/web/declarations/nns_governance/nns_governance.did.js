@@ -1,6 +1,6 @@
 // Browser-compatible, reduced declaration for the NNS Governance canister.
 // Source: https://github.com/dfinity/ic/blob/master/rs/nns/governance/canister/governance.did
-// Scope: this app only calls the `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info` queries. The record shapes below keep
+// Scope: this app only calls the `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info` queries. The record shapes below keep
 // the request fields we send and the response fields consumed by query-normalizers.js;
 // extra upstream response fields are intentionally omitted from this checked-in browser declaration.
 export const idlFactory = ({ IDL }) => {
@@ -55,6 +55,16 @@ export const idlFactory = ({ IDL }) => {
   });
   const ListKnownNeuronsResponse = IDL.Record({
     known_neurons: IDL.Vec(KnownNeuron),
+  });
+  const AccountIdentifier = IDL.Record({
+    hash: IDL.Vec(IDL.Nat8),
+  });
+  const NodeProvider = IDL.Record({
+    id: IDL.Opt(IDL.Principal),
+    reward_account: IDL.Opt(AccountIdentifier),
+  });
+  const ListNodeProvidersResponse = IDL.Record({
+    node_providers: IDL.Vec(NodeProvider),
   });
   const Tally = IDL.Record({
     yes: IDL.Nat64,
@@ -129,6 +139,7 @@ export const idlFactory = ({ IDL }) => {
   return IDL.Service({
     list_neurons: IDL.Func([ListNeurons], [ListNeuronsResponse], ['query']),
     list_known_neurons: IDL.Func([], [ListKnownNeuronsResponse], ['query']),
+    list_node_providers: IDL.Func([], [ListNodeProvidersResponse], ['query']),
     get_pending_proposals: IDL.Func(
       [IDL.Opt(GetPendingProposalsRequest)],
       [IDL.Vec(ProposalInfo)],
