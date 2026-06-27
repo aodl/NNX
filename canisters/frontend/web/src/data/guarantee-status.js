@@ -2,6 +2,7 @@ import { GUARANTEE_ANCHOR_NEURONS, MAX_GUARANTEE_DEPTH } from '../app/config.js'
 import { getEffectiveFollowees } from './effective-followees.js';
 
 const ANCHORS = new Set(Object.values(GUARANTEE_ANCHOR_NEURONS).map((id) => id.toString()));
+const OMEGA_REJECT_ID = GUARANTEE_ANCHOR_NEURONS.omegaReject.toString();
 
 function result(status, reason = null, extra = {}) {
   return {
@@ -25,6 +26,11 @@ function neuronProofFields(neuron) {
 
 function mergeChildren(neuron, children) {
   const parent = neuronProofFields(neuron);
+  const hasOmegaReject = children.some((child) => child.neuronId?.toString() === OMEGA_REJECT_ID);
+  if (hasOmegaReject && children.length <= 2) {
+    return result('guaranteed', null, { ...parent, children });
+  }
+
   const unknown = children.find((child) => child.status === 'unknown');
   if (unknown) return result('unknown', unknown.reason, { ...parent, children, depthLimitReached: unknown.depthLimitReached });
   const privateChild = children.find((child) => child.status === 'private');
