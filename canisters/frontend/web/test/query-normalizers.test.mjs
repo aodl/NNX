@@ -114,7 +114,6 @@ test('normalizes proposal title when present', () => {
   assert.equal(proposal.decidedAtSeconds, 0n);
   assert.equal(proposal.proposerNeuronId, 456n);
   assert.equal(proposal.proposerKnownNeuronName, null);
-  assert.equal(proposal.dashboardUrl, 'https://dashboard.internetcomputer.org/proposal/123');
 });
 
 test('normalizes known proposer neuron name when available', () => {
@@ -328,8 +327,4 @@ test('preserves BigInt proposal IDs in proposal list response', () => {
 
   assert.equal(proposal.id, 18_446_744_073_709_551_615n);
   assert.equal(proposal.proposerKnownNeuronName, 'Known Proposer');
-  assert.equal(
-    proposal.dashboardUrl,
-    'https://dashboard.internetcomputer.org/proposal/18446744073709551615',
-  );
 });

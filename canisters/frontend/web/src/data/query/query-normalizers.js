@@ -336,7 +336,6 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
     timeRemainingSeconds: remainingSeconds,
     ...deadlineUrgency(remainingSeconds),
     tally: normalizeTally(proposalInfo?.latest_tally),
-    dashboardUrl: `https://dashboard.internetcomputer.org/proposal/${id.toString()}`,
   };
 }
 
