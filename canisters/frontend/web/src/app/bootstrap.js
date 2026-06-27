@@ -2,8 +2,19 @@ import { parseRoute } from './router.js';
 import { createAgentQueryBackend } from '../data/query/agent-query-backend.js';
 import { createIcQueryFacade } from '../data/query/ic-query-facade.js';
 import { createNeuronLoader } from '../data/neuron-loader.js';
+import { createProposalLoader } from '../data/proposal-loader.js';
+import { renderHomePage } from '../ui/home-page.js';
 import { renderNeuronPage } from '../ui/neuron-page.js';
 import { renderNotFoundPage } from '../ui/not-found-page.js';
+import { renderProposalPage } from '../ui/proposal-page.js';
+
+async function createQueryFacade(windowRef) {
+  const hostname = windowRef.location.hostname;
+  const local = hostname === 'localhost' || hostname === '127.0.0.1';
+  const host = local ? windowRef.location.origin : 'https://icp0.io';
+  const queryBackend = await createAgentQueryBackend({ host, local });
+  return createIcQueryFacade({ backend: queryBackend });
+}
 
 export async function bootstrap({ windowRef = window, documentRef = document } = {}) {
   const root = documentRef.getElementById('app');
@@ -15,12 +26,20 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
     return;
   }
 
-  const hostname = windowRef.location.hostname;
-  const local = hostname === 'localhost' || hostname === '127.0.0.1';
-  const host = local ? windowRef.location.origin : 'https://icp0.io';
-  const queryBackend = await createAgentQueryBackend({ host, local });
-  const queryFacade = createIcQueryFacade({ backend: queryBackend });
-  const neuronLoader = createNeuronLoader({ queryFacade });
+  const queryFacade = await createQueryFacade(windowRef);
 
+  if (route.kind === 'home') {
+    const proposalLoader = createProposalLoader({ queryFacade });
+    await renderHomePage(root, { proposalLoader });
+    return;
+  }
+
+  if (route.kind === 'proposal') {
+    const proposalLoader = createProposalLoader({ queryFacade });
+    await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader });
+    return;
+  }
+
+  const neuronLoader = createNeuronLoader({ queryFacade });
   await renderNeuronPage(root, { neuronId: route.neuronId, neuronLoader });
 }

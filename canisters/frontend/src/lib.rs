@@ -104,11 +104,17 @@ fn certify_all_assets() {
             path: "index.html".to_string(),
             content_type: Some("text/html".to_string()),
             headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
-            fallback_for: vec![AssetFallbackConfig {
-                scope: "/neuron/".to_string(),
-                status_code: Some(StatusCode::OK),
-            }],
-            aliased_by: vec![],
+            fallback_for: vec![
+                AssetFallbackConfig {
+                    scope: "/neuron/".to_string(),
+                    status_code: Some(StatusCode::OK),
+                },
+                AssetFallbackConfig {
+                    scope: "/proposal/".to_string(),
+                    status_code: Some(StatusCode::OK),
+                },
+            ],
+            aliased_by: vec!["/".to_string()],
             encodings: compressed_encodings.clone(),
         },
         AssetConfig::File {
@@ -195,6 +201,13 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
         .get_file(".well-known/ic-domains")
         .ok_or_else(|| ".well-known/ic-domains is missing from frontend assets".to_string())?;
 
+    insert_head_asset(
+        &mut head_assets,
+        "/",
+        StatusCode::OK,
+        headers_for_path("index.html", index.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
     insert_head_asset(
         &mut head_assets,
         "/neuron/",
@@ -404,11 +417,11 @@ fn is_public_route(path: &str) -> bool {
     if path.starts_with("/generated/app.") && path.ends_with(".js") {
         return true;
     }
-    is_valid_neuron_route(path)
+    is_valid_id_route(path, "/neuron/") || is_valid_id_route(path, "/proposal/")
 }
 
-fn is_valid_neuron_route(path: &str) -> bool {
-    let Some(id) = path.strip_prefix("/neuron/") else {
+fn is_valid_id_route(path: &str, prefix: &str) -> bool {
+    let Some(id) = path.strip_prefix(prefix) else {
         return false;
     };
     if id.is_empty() || id.contains('/') || !id.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -419,11 +432,7 @@ fn is_valid_neuron_route(path: &str) -> bool {
 
 fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
     if req.method() == Method::HEAD {
-        let fallback_req = HttpRequest::builder()
-            .with_method(Method::HEAD)
-            .with_url("/")
-            .build();
-        return serve_head_asset(certificate, &fallback_req);
+        return serve_head_not_found(certificate, req);
     }
 
     let fallback_req = HttpRequest::get("/missing").build();
@@ -431,6 +440,44 @@ fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'st
         match asset_router.serve_asset(certificate, &fallback_req) {
             Ok(response) => response,
             Err(err) => asset_error_response(&err),
+        }
+    })
+}
+
+fn serve_head_not_found(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
+    let path = match req.get_path() {
+        Ok(path) => path,
+        Err(err) => return asset_error_response(&AssetCertificationError::from(err)),
+    };
+
+    HEAD_ASSETS.with_borrow(|head_assets| {
+        match head_assets
+            .get(&HeadAssetKey {
+                path: "/".to_string(),
+                match_kind: HeadAssetMatchKind::Fallback,
+            })
+            .cloned()
+        {
+            Some(mut asset) => {
+                let witness = HTTP_TREE.with(|tree| {
+                    tree.borrow()
+                        .witness(&asset.tree_entry, &path)
+                        .map_err(AssetCertificationError::from)
+                });
+                match witness {
+                    Ok(witness) => {
+                        add_v2_certificate_header(
+                            certificate,
+                            &mut asset.response,
+                            &witness,
+                            &asset.tree_entry.path.to_expr_path(),
+                        );
+                        asset.response
+                    }
+                    Err(err) => asset_error_response(&err),
+                }
+            }
+            None => plain_error_response(StatusCode::NOT_FOUND, "not found"),
         }
     })
 }
@@ -570,8 +617,32 @@ mod tests {
     }
 
     #[test]
+    fn root_route_returns_index_with_200() {
+        let response = get("/");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn head_root_route_returns_index_metadata_with_200() {
+        let response = head("/");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+    }
+
+    #[test]
     fn neuron_route_returns_index_with_200() {
         let response = get("/neuron/2947465672511369");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn proposal_route_returns_index_with_200() {
+        let response = get("/proposal/2947465672511369");
         assert_eq!(response.status_code(), StatusCode::OK);
         assert_eq!(header_value(&response, "content-type"), Some("text/html"));
         assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
@@ -590,9 +661,35 @@ mod tests {
     }
 
     #[test]
-    fn root_and_missing_return_404() {
-        assert_eq!(get("/").status_code(), StatusCode::NOT_FOUND);
+    fn malformed_proposal_route_returns_404() {
+        assert_eq!(
+            get("/proposal/not-a-number").status_code(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get("/proposal/123/extra").status_code(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn missing_returns_404() {
         assert_eq!(get("/missing").status_code(), StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn head_invalid_routes_return_404() {
+        let unknown = head("/unknown");
+        assert_eq!(unknown.status_code(), StatusCode::NOT_FOUND);
+        assert!(unknown.body().is_empty());
+
+        let malformed_neuron = head("/neuron/not-a-number");
+        assert_eq!(malformed_neuron.status_code(), StatusCode::NOT_FOUND);
+        assert!(malformed_neuron.body().is_empty());
+
+        let malformed_proposal = head("/proposal/not-a-number");
+        assert_eq!(malformed_proposal.status_code(), StatusCode::NOT_FOUND);
+        assert!(malformed_proposal.body().is_empty());
     }
 
     #[test]
@@ -625,7 +722,7 @@ mod tests {
             header_value(&index, "cache-control"),
             Some(NO_CACHE_ASSET_CACHE_CONTROL)
         );
-        let not_found = get("/");
+        let not_found = get("/missing");
         assert_eq!(
             header_value(&not_found, "cache-control"),
             Some(NO_CACHE_ASSET_CACHE_CONTROL)

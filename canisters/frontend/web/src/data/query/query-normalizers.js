@@ -1,3 +1,9 @@
+import { NNS_TOPICS } from '../topics.js';
+
+const MAX_DATE_MS = 8_640_000_000_000_000n;
+const PROPOSAL_URGENCY_WINDOW_SECONDS = 48n * 60n * 60n;
+const PROPOSAL_URGENCY_WARNING_SECONDS = 6n * 60n * 60n;
+
 function unwrapOpt(value) {
   return Array.isArray(value) ? (value.length === 0 ? null : value[0]) : value ?? null;
 }
@@ -13,6 +19,210 @@ function neuronIdValue(value) {
 function principalText(value) {
   const unwrapped = unwrapOpt(value);
   return unwrapped ? unwrapped.toString() : null;
+}
+
+function nat64OrNull(value) {
+  const unwrapped = unwrapOpt(value);
+  if (unwrapped === null || unwrapped === undefined) return null;
+  return BigInt(unwrapped);
+}
+
+function int32Value(value, fallback = 0) {
+  if (value === null || value === undefined) return fallback;
+  return Number(value);
+}
+
+function dateFromTimestampSeconds(seconds) {
+  if (seconds === null) return null;
+  const milliseconds = seconds * 1000n;
+  if (milliseconds < -MAX_DATE_MS || milliseconds > MAX_DATE_MS) return null;
+  return new Date(Number(milliseconds));
+}
+
+function timeRemaining(deadlineTimestampSeconds) {
+  if (deadlineTimestampSeconds === null) return null;
+  const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+  const remaining = deadlineTimestampSeconds - nowSeconds;
+  if (remaining <= 0n) return 0;
+  const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+  return remaining > maxSafe ? Number.MAX_SAFE_INTEGER : Number(remaining);
+}
+
+function topicLabel(topicId) {
+  return NNS_TOPICS.find((topic) => topic.id === topicId)?.label ?? `Topic ${topicId}`;
+}
+
+function proposalTitle(proposal) {
+  const title = unwrapOpt(proposal?.title);
+  if (typeof title === 'string' && title.trim()) return title.trim();
+  const summary = proposal?.summary;
+  if (typeof summary === 'string' && summary.trim()) {
+    return summary.trim().split(/\s+/).slice(0, 12).join(' ');
+  }
+  return 'Untitled proposal';
+}
+
+function proposalStatus(value) {
+  switch (int32Value(value)) {
+    case 1:
+      return { statusLabel: 'Open', statusKind: 'open' };
+    case 2:
+      return { statusLabel: 'Rejected', statusKind: 'rejected' };
+    case 3:
+      return { statusLabel: 'Adopted', statusKind: 'adopted' };
+    case 4:
+      return { statusLabel: 'Executed', statusKind: 'executed' };
+    case 5:
+      return { statusLabel: 'Failed', statusKind: 'failed' };
+    default:
+      return { statusLabel: 'Unknown', statusKind: 'unknown' };
+  }
+}
+
+function proposalRewardStatus(value) {
+  switch (int32Value(value)) {
+    case 1:
+      return 'Accepting votes';
+    case 2:
+      return 'Ready to settle';
+    case 3:
+      return 'Settled';
+    case 4:
+      return 'Ineligible';
+    default:
+      return 'Unknown';
+  }
+}
+
+function normalizeTally(tally) {
+  const unwrapped = unwrapOpt(tally);
+  if (!unwrapped) return null;
+
+  const yes = BigInt(unwrapped.yes ?? 0n);
+  const no = BigInt(unwrapped.no ?? 0n);
+  const total = BigInt(unwrapped.total ?? 0n);
+  const votedYesNoTotal = yes + no;
+  const uncast = total > votedYesNoTotal ? total - votedYesNoTotal : 0n;
+  const yesPercent = total === 0n ? 0 : Number((yes * 10_000n) / total) / 100;
+  const noPercent = total === 0n ? 0 : Number((no * 10_000n) / total) / 100;
+  const uncastPercent = total === 0n ? 0 : Number((uncast * 10_000n) / total) / 100;
+  const yesVotePercent = votedYesNoTotal === 0n
+    ? 0
+    : Number((yes * 10_000n) / votedYesNoTotal) / 100;
+  const noVotePercent = votedYesNoTotal === 0n
+    ? 0
+    : Number((no * 10_000n) / votedYesNoTotal) / 100;
+
+  return {
+    yes,
+    no,
+    total,
+    votedYesNoTotal,
+    uncast,
+    yesPercent,
+    noPercent,
+    uncastPercent,
+    yesVotePercent,
+    noVotePercent,
+  };
+}
+
+function deadlineUrgency(timeRemainingSecondsValue) {
+  if (timeRemainingSecondsValue === null) {
+    return {
+      deadlineUrgencyPercent: 0,
+      deadlineUrgencyLevel: 'unavailable',
+    };
+  }
+
+  if (timeRemainingSecondsValue <= 0) {
+    return {
+      deadlineUrgencyPercent: 100,
+      deadlineUrgencyLevel: 'expired',
+    };
+  }
+
+  const remaining = BigInt(Math.floor(timeRemainingSecondsValue));
+  const rawPercent = remaining >= PROPOSAL_URGENCY_WINDOW_SECONDS
+    ? 6
+    : Number(((PROPOSAL_URGENCY_WINDOW_SECONDS - remaining) * 10_000n)
+      / PROPOSAL_URGENCY_WINDOW_SECONDS) / 100;
+  const deadlineUrgencyPercent = Math.max(0, Math.min(100, rawPercent));
+  const deadlineUrgencyLevel = remaining <= PROPOSAL_URGENCY_WARNING_SECONDS
+    ? 'warning'
+    : 'safe';
+
+  return { deadlineUrgencyPercent, deadlineUrgencyLevel };
+}
+
+function selfDescribingValueText(value, depth = 0) {
+  const unwrapped = unwrapOpt(value);
+  if (unwrapped === null || unwrapped === undefined) return null;
+  if (typeof unwrapped !== 'object') return unwrapped.toString();
+
+  if ('Text' in unwrapped) return unwrapped.Text;
+  if ('Bool' in unwrapped) return unwrapped.Bool ? 'True' : 'False';
+  if ('Nat' in unwrapped) return unwrapped.Nat.toString();
+  if ('Int' in unwrapped) return unwrapped.Int.toString();
+  if ('Blob' in unwrapped) return `${unwrapped.Blob.length} bytes`;
+  if ('Null' in unwrapped) return 'None';
+
+  if ('Array' in unwrapped) {
+    const items = unwrapped.Array
+      .map((item) => selfDescribingValueText(item, depth + 1))
+      .filter(Boolean);
+    return items.length ? items.join(depth === 0 ? '\n' : ', ') : null;
+  }
+
+  if ('Map' in unwrapped) {
+    const indent = '  '.repeat(depth);
+    const lines = unwrapped.Map
+      .map(([key, item]) => {
+        const itemText = selfDescribingValueText(item, depth + 1);
+        return itemText ? `${indent}${key}: ${itemText}` : null;
+      })
+      .filter(Boolean);
+    return lines.length ? lines.join('\n') : null;
+  }
+
+  return null;
+}
+
+function selfDescribingValueEntries(value) {
+  const unwrapped = unwrapOpt(value);
+  if (!unwrapped || typeof unwrapped !== 'object' || !('Map' in unwrapped)) return [];
+  return unwrapped.Map
+    .map(([name, item]) => {
+      const itemText = selfDescribingValueText(item, 0);
+      return itemText ? { name, value: itemText } : null;
+    })
+    .filter(Boolean);
+}
+
+function proposalSelfDescribingAction(proposal) {
+  const action = unwrapOpt(proposal?.self_describing_action);
+  if (!action) {
+    return {
+      actionTypeName: null,
+      actionDescription: 'Action unavailable.',
+      actionDetails: null,
+      actionValues: [],
+    };
+  }
+
+  const typeName = unwrapOpt(action.type_name);
+  const description = unwrapOpt(action.type_description);
+  const actionValues = selfDescribingValueEntries(action.value);
+  const details = actionValues.length === 0 ? selfDescribingValueText(action.value) : null;
+
+  return {
+    actionTypeName: typeof typeName === 'string' && typeName.trim() ? typeName.trim() : null,
+    actionDescription: typeof description === 'string' && description.trim()
+      ? description.trim()
+      : 'Action description unavailable.',
+    actionDetails: typeof details === 'string' && details.trim() ? details.trim() : null,
+    actionValues,
+  };
 }
 
 function visibilityOf(fullNeuron, info) {
@@ -89,4 +299,47 @@ export function normalizeKnownNeuronNamesResponse(response) {
     }
   }
   return names;
+}
+
+export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()) {
+  const id = neuronIdValue(proposalInfo?.id) ?? 0n;
+  const proposal = unwrapOpt(proposalInfo?.proposal);
+  const topicId = int32Value(proposalInfo?.topic);
+  const deadlineTimestampSeconds = nat64OrNull(proposalInfo?.deadline_timestamp_seconds);
+  const remainingSeconds = timeRemaining(deadlineTimestampSeconds);
+  const proposerNeuronId = neuronIdValue(proposalInfo?.proposer);
+  const proposerKnownNeuronName = proposerNeuronId === null
+    ? null
+    : knownNeuronNames.get(proposerNeuronId.toString()) ?? null;
+  const status = int32Value(proposalInfo?.status);
+  const rewardStatus = int32Value(proposalInfo?.reward_status);
+  const action = proposalSelfDescribingAction(proposal);
+
+  return {
+    id,
+    title: proposalTitle(proposal),
+    summary: proposal?.summary ?? '',
+    url: proposal?.url ?? '',
+    ...action,
+    topicId,
+    topicLabel: topicLabel(topicId),
+    status,
+    ...proposalStatus(status),
+    rewardStatus,
+    rewardStatusLabel: proposalRewardStatus(rewardStatus),
+    proposerNeuronId,
+    proposerKnownNeuronName,
+    createdAtSeconds: BigInt(proposalInfo?.proposal_timestamp_seconds ?? 0n),
+    decidedAtSeconds: BigInt(proposalInfo?.decided_timestamp_seconds ?? 0n),
+    deadlineTimestampSeconds,
+    deadlineDate: dateFromTimestampSeconds(deadlineTimestampSeconds),
+    timeRemainingSeconds: remainingSeconds,
+    ...deadlineUrgency(remainingSeconds),
+    tally: normalizeTally(proposalInfo?.latest_tally),
+    dashboardUrl: `https://dashboard.internetcomputer.org/proposal/${id.toString()}`,
+  };
+}
+
+export function normalizeOpenProposalListResponse(response, knownNeuronNames = new Map()) {
+  return (response ?? []).map((proposalInfo) => normalizeProposalInfo(proposalInfo, knownNeuronNames));
 }

@@ -1,10 +1,11 @@
 // Browser-compatible, reduced declaration for the NNS Governance canister.
 // Source: https://github.com/dfinity/ic/blob/master/rs/nns/governance/canister/governance.did
-// Scope: this app only calls the `list_neurons` and `list_known_neurons` queries. The record shapes below keep
+// Scope: this app only calls the `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info` queries. The record shapes below keep
 // the request fields we send and the response fields consumed by query-normalizers.js;
 // extra upstream response fields are intentionally omitted from this checked-in browser declaration.
 export const idlFactory = ({ IDL }) => {
   const NeuronId = IDL.Record({ id: IDL.Nat64 });
+  const ProposalId = IDL.Record({ id: IDL.Nat64 });
   const Followees = IDL.Record({ followees: IDL.Vec(NeuronId) });
   const KnownNeuronData = IDL.Record({
     name: IDL.Text,
@@ -55,10 +56,85 @@ export const idlFactory = ({ IDL }) => {
   const ListKnownNeuronsResponse = IDL.Record({
     known_neurons: IDL.Vec(KnownNeuron),
   });
+  const Tally = IDL.Record({
+    yes: IDL.Nat64,
+    no: IDL.Nat64,
+    total: IDL.Nat64,
+    timestamp_seconds: IDL.Nat64,
+  });
+  const Motion = IDL.Record({ motion_text: IDL.Text });
+  const Action = IDL.Variant({
+    RegisterKnownNeuron: IDL.Reserved,
+    DeregisterKnownNeuron: IDL.Reserved,
+    ManageNeuron: IDL.Reserved,
+    UpdateCanisterSettings: IDL.Reserved,
+    InstallCode: IDL.Reserved,
+    StopOrStartCanister: IDL.Reserved,
+    CreateServiceNervousSystem: IDL.Reserved,
+    ExecuteNnsFunction: IDL.Reserved,
+    RewardNodeProvider: IDL.Reserved,
+    OpenSnsTokenSwap: IDL.Reserved,
+    SetSnsTokenSwapOpenTimeWindow: IDL.Reserved,
+    SetDefaultFollowees: IDL.Reserved,
+    RewardNodeProviders: IDL.Reserved,
+    ManageNetworkEconomics: IDL.Reserved,
+    ApproveGenesisKyc: IDL.Reserved,
+    AddOrRemoveNodeProvider: IDL.Reserved,
+    Motion,
+    FulfillSubnetRentalRequest: IDL.Reserved,
+    BlessAlternativeGuestOsVersion: IDL.Reserved,
+    TakeCanisterSnapshot: IDL.Reserved,
+    LoadCanisterSnapshot: IDL.Reserved,
+    CreateCanisterAndInstallCode: IDL.Reserved,
+  });
+  const SelfDescribingValue = IDL.Rec();
+  SelfDescribingValue.fill(IDL.Variant({
+    Blob: IDL.Vec(IDL.Nat8),
+    Text: IDL.Text,
+    Bool: IDL.Bool,
+    Nat: IDL.Nat,
+    Int: IDL.Int,
+    Array: IDL.Vec(SelfDescribingValue),
+    Map: IDL.Vec(IDL.Tuple(IDL.Text, SelfDescribingValue)),
+    Null: IDL.Null,
+  }));
+  const SelfDescribingProposalAction = IDL.Record({
+    type_name: IDL.Opt(IDL.Text),
+    type_description: IDL.Opt(IDL.Text),
+    value: IDL.Opt(SelfDescribingValue),
+  });
+  const Proposal = IDL.Record({
+    title: IDL.Opt(IDL.Text),
+    summary: IDL.Text,
+    url: IDL.Text,
+    action: IDL.Opt(Action),
+    self_describing_action: IDL.Opt(SelfDescribingProposalAction),
+  });
+  const ProposalInfo = IDL.Record({
+    id: IDL.Opt(ProposalId),
+    status: IDL.Int32,
+    topic: IDL.Int32,
+    proposal_timestamp_seconds: IDL.Nat64,
+    deadline_timestamp_seconds: IDL.Opt(IDL.Nat64),
+    latest_tally: IDL.Opt(Tally),
+    reward_status: IDL.Int32,
+    decided_timestamp_seconds: IDL.Nat64,
+    proposal: IDL.Opt(Proposal),
+    proposer: IDL.Opt(NeuronId),
+  });
+  const GetPendingProposalsRequest = IDL.Record({
+    return_self_describing_action: IDL.Opt(IDL.Bool),
+  });
 
   return IDL.Service({
     list_neurons: IDL.Func([ListNeurons], [ListNeuronsResponse], ['query']),
     list_known_neurons: IDL.Func([], [ListKnownNeuronsResponse], ['query']),
+    get_pending_proposals: IDL.Func(
+      [IDL.Opt(GetPendingProposalsRequest)],
+      [IDL.Vec(ProposalInfo)],
+      ['query'],
+    ),
+    get_proposal_info: IDL.Func([IDL.Nat64], [IDL.Opt(ProposalInfo)], ['query']),
   });
 };
 

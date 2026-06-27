@@ -1,9 +1,17 @@
 import { HttpAgent } from '@icp-sdk/core/agent';
 import { createActor as createGovernanceActor } from '../../../declarations/nns_governance/index.js';
 import { GOVERNANCE_CANISTER_ID } from '../../app/config.js';
-import { normalizeKnownNeuronNamesResponse, normalizeNeuronListResponse } from './query-normalizers.js';
+import {
+  normalizeKnownNeuronNamesResponse,
+  normalizeNeuronListResponse,
+  normalizeOpenProposalListResponse,
+} from './query-normalizers.js';
 
 const KNOWN_NEURON_CACHE_MS = 60 * 60 * 1000;
+
+export function getPendingProposalsRequestOpt() {
+  return [{ return_self_describing_action: [false] }];
+}
 
 export async function createAgentQueryBackend({ host, local } = {}) {
   const agent = await HttpAgent.create({
@@ -62,5 +70,22 @@ export async function createAgentQueryBackend({ host, local } = {}) {
     return results[0] ?? { id: neuronId, exists: false };
   }
 
-  return Object.freeze({ getNnsNeuron, getNnsNeurons });
+  async function getOpenNnsProposals() {
+    const [response, names] = await Promise.all([
+      governance.get_pending_proposals(getPendingProposalsRequestOpt()),
+      getKnownNeuronNames(),
+    ]);
+    return normalizeOpenProposalListResponse(response, names);
+  }
+
+  async function getNnsProposal({ proposalId }) {
+    const [response, names] = await Promise.all([
+      governance.get_proposal_info(proposalId),
+      getKnownNeuronNames(),
+    ]);
+    const proposalInfo = Array.isArray(response) ? (response[0] ?? null) : response ?? null;
+    return proposalInfo ? normalizeOpenProposalListResponse([proposalInfo], names)[0] : null;
+  }
+
+  return Object.freeze({ getNnsNeuron, getNnsNeurons, getOpenNnsProposals, getNnsProposal });
 }

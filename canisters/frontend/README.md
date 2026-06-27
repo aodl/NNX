@@ -11,12 +11,16 @@ No custom JSON dashboard endpoints are exposed. Browser data reads go directly t
 ## Routes
 
 ```text
+GET  /                       -> index.html, 200
+HEAD /                       -> index metadata, 200
 GET  /neuron/{decimal_nat64}  -> index.html, 200
 HEAD /neuron/{decimal_nat64}  -> index metadata, 200
-GET  /                       -> 404.html, 404
-HEAD /                       -> 404 metadata, 404
 GET  /neuron/not-a-number    -> 404.html, 404
 GET  /neuron/123/extra       -> 404.html, 404
+GET  /proposal/{decimal_nat64}  -> index.html, 200
+HEAD /proposal/{decimal_nat64}  -> index metadata, 200
+GET  /proposal/not-a-number     -> 404.html, 404
+GET  /proposal/123/extra        -> 404.html, 404
 GET  /missing                -> 404.html, 404
 GET  /generated/app.<hash>.js -> JavaScript asset, 200
 GET  /generated/frontend-bundle.json -> 404
@@ -47,4 +51,4 @@ NNS Governance declarations are checked in under:
 canisters/frontend/web/declarations/nns_governance/
 ```
 
-The declaration is browser-compatible and scoped to the current `list_neurons` query use.
+The declaration is browser-compatible and scoped to the current `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info` query use.

@@ -2,7 +2,7 @@
 
 Network Nexus is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
-The initial scope is intentionally small: the only meaningful route is `/neuron/{neuron_id}`, where `neuron_id` is a decimal `nat64` NNS neuron ID. The page queries NNS Governance directly from the browser and displays neuron visibility, stake, controller/hotkeys when public, effective followees by topic, and a conservative structural guarantee status for whether the neuron is guaranteed not to miss votes.
+The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on, and `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance directly through the query facade.
 
 ## Tooling
 
@@ -33,16 +33,18 @@ icp network start -d
 ## Main Route
 
 ```text
+/                         open NNS proposals
 /neuron/{neuron_id}
+/proposal/{proposal_id}   NNS proposal detail
 ```
 
-Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
+The landing page reads NNS Governance `get_pending_proposals` as the source of truth for open proposals. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
 
 ## Query Architecture
 
 Application and UI modules do not import actors, agents, or Candid declarations directly. They depend on `createIcQueryFacade`.
 
-The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and the checked-in NNS Governance declarations to call `list_neurons`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
+The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and the checked-in NNS Governance declarations to call `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
 
 ## NNS Topic Generation
 
