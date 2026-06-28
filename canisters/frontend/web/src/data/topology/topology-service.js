@@ -10,6 +10,7 @@ import {
   createEmptyTopology,
   mergeProviderRegistryResponse,
   normalizeNodeProviderListResponse,
+  normalizeSubnet,
 } from './topology-normalizers.js';
 
 const DEFAULT_MAX_CONCURRENCY = 8;
@@ -60,6 +61,135 @@ async function getProviderTopology(registry, providerId) {
       ),
     };
   }
+}
+
+function requireSubnetRegistry(registry) {
+  if (!registry?.get_subnet) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Topology service requires a Registry query actor with get_subnet.',
+    );
+  }
+}
+
+function assertSubnetId(subnetId) {
+  if (typeof subnetId !== 'string' || subnetId.length === 0) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Subnet reads require a non-empty subnetId string.',
+    );
+  }
+}
+
+async function getSubnet(registry, subnetId) {
+  requireSubnetRegistry(registry);
+  assertSubnetId(subnetId);
+
+  let principal;
+  try {
+    principal = Principal.fromText(subnetId);
+  } catch (error) {
+    throw normalizeTopologyError(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Subnet reads require a valid principal text subnetId.',
+      error,
+    );
+  }
+
+  let response;
+  try {
+    response = await registry.get_subnet({ subnet_id: [principal] });
+  } catch (error) {
+    throw normalizeTopologyError(
+      TOPOLOGY_ERROR_CODES.REGISTRY_CALL_FAILED,
+      'Failed to read Registry subnet record.',
+      error,
+    );
+  }
+
+  if (response?.Err !== undefined) {
+    return {
+      subnet: null,
+      warnings: [topologyWarning(
+        TOPOLOGY_ERROR_CODES.REGISTRY_RESPONSE_ERR,
+        'Registry returned an error for a subnet query.',
+        { subnetId, error: response.Err },
+      )],
+    };
+  }
+
+  if (response?.Ok === undefined) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Registry returned an unexpected subnet response.',
+    );
+  }
+
+  const warnings = [];
+  const subnet = normalizeSubnet(response.Ok, subnetId, warnings);
+  return { subnet, warnings };
+}
+
+function hasKnownSubnetIds(options) {
+  return Array.isArray(options?.subnetIds);
+}
+
+async function discoverSubnetIds(rawRegistryClient) {
+  if (!rawRegistryClient?.listSubnetIds) {
+    throw new IcTopologyError(
+      TOPOLOGY_ERROR_CODES.RAW_REGISTRY_UNAVAILABLE,
+      'Full subnet discovery requires a raw Registry client that can read subnet_list.',
+    );
+  }
+
+  return rawRegistryClient.listSubnetIds();
+}
+
+async function loadKnownSubnets({
+  registry,
+  subnetIds,
+  rawRegistryClient = null,
+  maxConcurrency = DEFAULT_MAX_CONCURRENCY,
+}) {
+  if (!Array.isArray(subnetIds)) subnetIds = await discoverSubnetIds(rawRegistryClient);
+  if (subnetIds.length === 0) {
+    return { subnets: [], warnings: [] };
+  }
+
+  const results = await mapWithConcurrency(
+    subnetIds,
+    maxConcurrency,
+    async (subnetId) => {
+      try {
+        return await getSubnet(registry, subnetId);
+      } catch (error) {
+        return {
+          subnet: null,
+          warnings: [topologyWarning(
+            error?.code ?? TOPOLOGY_ERROR_CODES.REGISTRY_CALL_FAILED,
+            'Failed to read a known Registry subnet record.',
+            { subnetId, message: error?.message ?? String(error) },
+          )],
+        };
+      }
+    },
+  );
+
+  const subnets = [];
+  const warnings = [];
+  for (const result of results) {
+    warnings.push(...(result?.warnings ?? []));
+    if (result?.subnet) subnets.push(result.subnet);
+  }
+
+  if (warnings.length > 0 && subnets.length > 0) {
+    warnings.push(topologyWarning(
+      TOPOLOGY_ERROR_CODES.PARTIAL_TOPOLOGY,
+      'Subnet reads returned partial data; one or more known subnet records could not be fully read.',
+    ));
+  }
+
+  return { subnets, warnings };
 }
 
 export async function loadIcTopology({ governance, registry, maxConcurrency = DEFAULT_MAX_CONCURRENCY } = {}) {
@@ -121,13 +251,28 @@ export async function loadIcTopology({ governance, registry, maxConcurrency = DE
 export function createTopologyService({
   governance,
   registry,
+  rawRegistryClient = null,
   cache = createTopologyCache(),
   maxConcurrency = DEFAULT_MAX_CONCURRENCY,
 } = {}) {
   const fetchTopology = () => loadIcTopology({ governance, registry, maxConcurrency });
 
   async function getIcTopology(options = {}) {
-    return cache.get(fetchTopology, { refresh: Boolean(options.refresh) });
+    const topology = await cache.get(fetchTopology, { refresh: Boolean(options.refresh) });
+    if (!hasKnownSubnetIds(options)) return topology;
+
+    const { subnets, warnings } = await loadKnownSubnets({
+      registry,
+      subnetIds: options.subnetIds,
+      rawRegistryClient,
+      maxConcurrency,
+    });
+
+    return {
+      ...topology,
+      subnets,
+      warnings: [...topology.warnings, ...warnings],
+    };
   }
 
   async function refreshIcTopology() {
@@ -139,6 +284,38 @@ export function createTopologyService({
     return Object.values(normalizeNodeProviderListResponse(response).nodeProvidersById);
   }
 
+  async function getIcSubnet({ subnetId } = {}) {
+    const { subnet } = await getSubnet(registry, subnetId);
+    return subnet;
+  }
+
+  async function getIcSubnets(options = {}) {
+    return loadKnownSubnets({
+      registry,
+      subnetIds: options.subnetIds,
+      rawRegistryClient,
+      maxConcurrency,
+    });
+  }
+
+  async function getIcSubnetNodeCounts(options = {}) {
+    const { subnets, warnings } = await getIcSubnets(options);
+    const countsBySubnetId = {};
+
+    for (const subnet of subnets) {
+      countsBySubnetId[subnet.id] = {
+        subnetId: subnet.id,
+        nodeCount: subnet.nodeCount,
+        nodeIds: subnet.nodeIds,
+        type: subnet.type,
+        replicaVersionId: subnet.replicaVersionId,
+        isHalted: subnet.isHalted,
+      };
+    }
+
+    return { countsBySubnetId, warnings };
+  }
+
   function clearTopologyCache() {
     cache.clear();
   }
@@ -146,6 +323,9 @@ export function createTopologyService({
   return Object.freeze({
     getIcTopology,
     getIcNodeProviders,
+    getIcSubnet,
+    getIcSubnets,
+    getIcSubnetNodeCounts,
     refreshIcTopology,
     clearTopologyCache,
   });

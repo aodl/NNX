@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  normalizeCmcDefaultSubnetsResponse,
+  normalizeCmcSubnetLabelsResponse,
   normalizeKnownNeuronNamesResponse,
   normalizeNeuronListResponse,
   normalizeOpenProposalListResponse,
   normalizeProposalInfo,
 } from '../src/data/query/query-normalizers.js';
+import { TOPOLOGY_ERROR_CODES } from '../src/data/topology/topology-errors.js';
 
 test('prefers public NeuronInfo stake over cached full-neuron stake', () => {
   const [neuron] = normalizeNeuronListResponse(
@@ -68,6 +71,65 @@ test('normalizes list_known_neurons response into id name map', () => {
   });
 
   assert.equal(names.get('1'), 'Known Node');
+});
+
+test('normalizes CMC subnet label assignments', () => {
+  const response = {
+    data: [
+      ['Fiduciary', [{ toText: () => 'subnet-1' }]],
+      ['European', [{ toText: () => 'subnet-2' }]],
+    ],
+  };
+
+  const { labelsBySubnetId, warnings } = normalizeCmcSubnetLabelsResponse(response);
+
+  assert.deepEqual(labelsBySubnetId, {
+    'subnet-1': 'Fiduciary',
+    'subnet-2': 'European',
+  });
+  assert.deepEqual(warnings, []);
+});
+
+test('normalizes duplicate CMC subnet labels with a validation warning', () => {
+  const response = {
+    data: [
+      ['Fiduciary', [{ toText: () => 'subnet-1' }]],
+      ['European', [{ toText: () => 'subnet-1' }]],
+    ],
+  };
+
+  const { labelsBySubnetId, warnings } = normalizeCmcSubnetLabelsResponse(response);
+
+  assert.deepEqual(labelsBySubnetId, { 'subnet-1': 'Fiduciary' });
+  assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.VALIDATION_FAILED);
+  assert.equal(warnings[0].details.ignoredLabel, 'European');
+});
+
+test('normalizes malformed CMC subnet assignments with a validation warning', () => {
+  const { labelsBySubnetId, warnings } = normalizeCmcSubnetLabelsResponse({
+    data: [['Fiduciary', [{}]]],
+  });
+
+  assert.deepEqual(labelsBySubnetId, {});
+  assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.VALIDATION_FAILED);
+  assert.equal(warnings[0].details.label, 'Fiduciary');
+});
+
+test('normalizes CMC default subnet assignments', () => {
+  const { defaultSubnetIds, warnings } = normalizeCmcDefaultSubnetsResponse([
+    { toText: () => 'subnet-1' },
+    { toText: () => 'subnet-2' },
+  ]);
+
+  assert.deepEqual(defaultSubnetIds, ['subnet-1', 'subnet-2']);
+  assert.deepEqual(warnings, []);
+});
+
+test('normalizes malformed CMC default subnets with a validation warning', () => {
+  const { defaultSubnetIds, warnings } = normalizeCmcDefaultSubnetsResponse([{}]);
+
+  assert.deepEqual(defaultSubnetIds, []);
+  assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.VALIDATION_FAILED);
 });
 
 function proposalInfo(overrides = {}) {
@@ -136,12 +198,13 @@ test('normalizes proposal status labels', () => {
 });
 
 test('normalizes self describing proposal action', () => {
+  const subnetId = 'tdb26-jop6k-aogll-7ltgs-eruif-6kk7m-qpktf-gdiqx-mxtrf-vb5e6-eqe';
   const proposal = normalizeProposalInfo(proposalInfo({
     proposal: [{
       title: ['Motion proposal'],
       summary: 'Motion summary.',
       url: '',
-      action: [{ Motion: { motion_text: 'Motion payload text.' } }],
+      action: [{ Motion: { motion_text: 'Motion payload text.', subnet_id: { toText: () => subnetId } } }],
       self_describing_action: [{
         type_name: ['Motion'],
         type_description: ['Motion payload text.'],
@@ -149,6 +212,7 @@ test('normalizes self describing proposal action', () => {
           Map: [
             ['motion_text', { Text: 'Motion payload text.' }],
             ['motion_id', { Nat: 42n }],
+            ['subnet_id', { Text: subnetId }],
           ],
         }],
       }],
@@ -161,7 +225,9 @@ test('normalizes self describing proposal action', () => {
   assert.deepEqual(proposal.actionValues, [
     { name: 'motion_text', value: 'Motion payload text.' },
     { name: 'motion_id', value: '42' },
+    { name: 'subnet_id', value: subnetId },
   ]);
+  assert.match(proposal.payloadSearchText, new RegExp(subnetId));
 });
 
 test('normalizes absent proposal title with summary fallback', () => {

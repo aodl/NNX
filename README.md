@@ -2,7 +2,7 @@
 
 Network Nexus is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
-The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on, and `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance and Registry through the query facade.
+The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
 
 ## Tooling
 
@@ -38,19 +38,20 @@ icp network start -d
 /proposal/{proposal_id}   NNS proposal detail
 ```
 
-The landing page reads NNS Governance `get_pending_proposals` as the source of truth for open proposals. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
+The landing page reads NNS Governance `get_pending_proposals` as the source of truth for open proposals, Registry subnet records as the source of truth for subnet membership/node counts, and CMC subnet type assignments for placement labels such as `Fiduciary`. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
 
 ## Query Architecture
 
 Application and UI modules do not import actors, agents, or Candid declarations directly. They depend on `createIcQueryFacade`.
 
-The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and checked-in reduced NNS Governance and Registry declarations. It calls Governance `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info`, plus Registry topology queries. A future `ic-query` backend can replace this module without changing UI or domain call sites.
+The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and checked-in reduced NNS Governance, Registry, and CMC declarations. It calls Governance `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info`, Registry topology queries, raw Registry `subnet_list` discovery, and CMC `get_subnet_types_to_subnets`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
 
 Mainnet canister IDs:
 
 ```text
 NNS Governance  rrkah-fqaaa-aaaaa-aaaaq-cai
 NNS Registry    rwlgt-iiaaa-aaaaa-aaaaa-cai
+CMC             rkp4c-7iaaa-aaaaa-aaaca-cai
 ```
 
 ## Onchain Data Proxy
@@ -60,6 +61,14 @@ The first NNX onchain data proxy lives behind `createIcQueryFacade` and returns 
 ```js
 const topology = await queryFacade.getIcTopology();
 const providers = await queryFacade.getIcNodeProviders();
+const subnet = await queryFacade.getIcSubnet({ subnetId: 'known-subnet-id' });
+const { subnets, warnings } = await queryFacade.getIcSubnets({
+  subnetIds: ['known-subnet-id'],
+});
+const { countsBySubnetId } = await queryFacade.getIcSubnetNodeCounts({
+  subnetIds: ['known-subnet-id'],
+});
+const { labelsBySubnetId } = await queryFacade.getCmcSubnetLabels();
 await queryFacade.refreshIcTopology();
 queryFacade.clearTopologyCache();
 ```
@@ -70,7 +79,27 @@ queryFacade.clearTopologyCache();
 2. Registry `get_node_operators_and_dcs_of_node_provider(providerPrincipal)` for each provider.
 3. Normalization into node providers, node operators, and data centers.
 
-Complete subnet and node discovery is not guaranteed in this Candid-safe mode. The Registry declaration includes `get_subnet` and `get_subnet_for_canister` for known-ID reads, but this PR intentionally does not invent a method for listing every subnet and does not decode raw Registry protobuf key/value records. `raw-registry-client.js` is an isolated placeholder that throws `RAW_REGISTRY_UNAVAILABLE` until a later raw Registry implementation or backend/indexer is added.
+Candid-safe subnet reads are available when callers already know subnet IDs:
+
+- `getIcSubnet({ subnetId })` reads one Registry `get_subnet` record and returns a normalized subnet or `null` for Registry `Err`.
+- `getIcSubnets({ subnetIds })` reads known subnet IDs with bounded concurrency and returns `{ subnets, warnings }`.
+- `getIcSubnetNodeCounts({ subnetIds })` returns `{ countsBySubnetId, warnings }` for display code that only needs node counts and basic subnet metadata.
+
+Example:
+
+```js
+const { countsBySubnetId, warnings } = await queryFacade.getIcSubnetNodeCounts({
+  subnetIds: ['known-subnet-id'],
+});
+```
+
+`getIcSubnets()` without `subnetIds` discovers the complete subnet ID list through the Registry canister's raw protobuf `get_value` query for the `subnet_list` key, then reads each subnet through Candid-safe `get_subnet`. The raw protobuf code is isolated in `raw-registry-client.js`; UI and domain modules still receive normalized plain JavaScript objects only.
+
+If raw Registry discovery is unavailable in a future backend, `getIcSubnets()` without IDs must fail clearly with `RAW_REGISTRY_UNAVAILABLE`, not return an empty all-subnet result.
+
+`getCmcSubnetLabels()` reads CMC `get_subnet_types_to_subnets()` and `get_default_subnets()`, then normalizes them into `{ labelsBySubnetId, defaultSubnetIds, publicSubnetIds, warnings }`. CMC labels are kept separate from Registry subnet type: CMC labels are user-facing placement labels such as `Fiduciary` or other CMC-configured subnet types, while Registry type remains `system`, `application`, `verified_application`, or `cloud_engine`.
+
+The landing page uses `subnet-loader.js` to merge Registry subnet records with CMC labels, group subnets by `nodeCount`, and render expandable node-count groups. Subnets in the CMC default subnet list or assigned to a CMC subnet type are shown as Permissionless; all others are shown as Unknown. CMC labels are displayed only when the CMC assigns one. UI modules do not import the CMC actor, Registry actor, raw Registry key names, protobuf helpers, or principal utilities.
 
 Topology cache behavior:
 

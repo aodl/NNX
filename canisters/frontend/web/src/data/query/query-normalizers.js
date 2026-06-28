@@ -1,4 +1,5 @@
 import { NNS_TOPICS } from '../topics.js';
+import { TOPOLOGY_ERROR_CODES, topologyWarning } from '../topology/topology-errors.js';
 
 const MAX_DATE_MS = 8_640_000_000_000_000n;
 const PROPOSAL_URGENCY_WINDOW_SECONDS = 48n * 60n * 60n;
@@ -199,6 +200,49 @@ function selfDescribingValueEntries(value) {
     .filter(Boolean);
 }
 
+function collectSearchText(value, output = [], seen = new Set()) {
+  if (value === null || value === undefined) return output;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectSearchText(item, output, seen);
+    }
+    return output;
+  }
+
+  if (typeof value === 'string') {
+    output.push(value);
+    return output;
+  }
+  if (['bigint', 'number', 'boolean'].includes(typeof value)) {
+    output.push(value.toString());
+    return output;
+  }
+  if (typeof value !== 'object') return output;
+  if (seen.has(value)) return output;
+  seen.add(value);
+
+  if (typeof value.toText === 'function') {
+    output.push(value.toText());
+    return output;
+  }
+  if (ArrayBuffer.isView(value)) return output;
+
+  for (const [key, item] of Object.entries(value)) {
+    output.push(key);
+    collectSearchText(item, output, seen);
+  }
+  return output;
+}
+
+function proposalPayloadSearchText(proposal) {
+  const parts = collectSearchText([
+    proposal?.action,
+    proposal?.self_describing_action,
+  ]);
+  return parts.join('\n');
+}
+
 function proposalSelfDescribingAction(proposal) {
   const action = unwrapOpt(proposal?.self_describing_action);
   if (!action) {
@@ -207,6 +251,7 @@ function proposalSelfDescribingAction(proposal) {
       actionDescription: 'Action unavailable.',
       actionDetails: null,
       actionValues: [],
+      payloadSearchText: proposalPayloadSearchText(proposal),
     };
   }
 
@@ -222,6 +267,7 @@ function proposalSelfDescribingAction(proposal) {
       : 'Action description unavailable.',
     actionDetails: typeof details === 'string' && details.trim() ? details.trim() : null,
     actionValues,
+    payloadSearchText: proposalPayloadSearchText(proposal),
   };
 }
 
@@ -341,4 +387,58 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
 
 export function normalizeOpenProposalListResponse(response, knownNeuronNames = new Map()) {
   return (response ?? []).map((proposalInfo) => normalizeProposalInfo(proposalInfo, knownNeuronNames));
+}
+
+export function normalizeCmcSubnetLabelsResponse(response) {
+  const labelsBySubnetId = {};
+  const warnings = [];
+
+  for (const [label, subnets] of response?.data ?? []) {
+    if (typeof label !== 'string' || label.length === 0) continue;
+    for (const subnet of subnets ?? []) {
+      const subnetId = typeof subnet?.toText === 'function'
+        ? subnet.toText()
+        : (typeof subnet === 'string' ? subnet : null);
+      if (!subnetId) {
+        warnings.push(topologyWarning(
+          TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+          'CMC returned a subnet label assignment without a valid subnet principal.',
+          { label },
+        ));
+        continue;
+      }
+      if (labelsBySubnetId[subnetId] && labelsBySubnetId[subnetId] !== label) {
+        warnings.push(topologyWarning(
+          TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+          'CMC returned multiple labels for one subnet; keeping the first label.',
+          { subnetId, firstLabel: labelsBySubnetId[subnetId], ignoredLabel: label },
+        ));
+        continue;
+      }
+      labelsBySubnetId[subnetId] = label;
+    }
+  }
+
+  return { labelsBySubnetId, warnings };
+}
+
+export function normalizeCmcDefaultSubnetsResponse(response) {
+  const defaultSubnetIds = [];
+  const warnings = [];
+
+  for (const subnet of response ?? []) {
+    const subnetId = typeof subnet?.toText === 'function'
+      ? subnet.toText()
+      : (typeof subnet === 'string' ? subnet : null);
+    if (!subnetId) {
+      warnings.push(topologyWarning(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'CMC returned a default subnet without a valid subnet principal.',
+      ));
+      continue;
+    }
+    defaultSubnetIds.push(subnetId);
+  }
+
+  return { defaultSubnetIds, warnings };
 }

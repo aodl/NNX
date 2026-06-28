@@ -3,6 +3,7 @@ import { createAgentQueryBackend } from '../data/query/agent-query-backend.js';
 import { createIcQueryFacade } from '../data/query/ic-query-facade.js';
 import { createNeuronLoader } from '../data/neuron-loader.js';
 import { createProposalLoader } from '../data/proposal-loader.js';
+import { createSubnetLoader } from '../data/subnet-loader.js';
 import { renderHomePage } from '../ui/home-page.js';
 import { renderNeuronPage } from '../ui/neuron-page.js';
 import { renderNotFoundPage } from '../ui/not-found-page.js';
@@ -30,7 +31,8 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
 
   if (route.kind === 'home') {
     const proposalLoader = createProposalLoader({ queryFacade });
-    await renderHomePage(root, { proposalLoader });
+    const subnetLoader = createSubnetLoader({ queryFacade });
+    await renderHomePage(root, { proposalLoader, subnetLoader });
     return;
   }
 

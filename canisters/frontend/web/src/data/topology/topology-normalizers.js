@@ -37,6 +37,16 @@ export function principalBlobToText(value) {
   }
 }
 
+function principalBlobToTextStrict(value) {
+  const data = bytes(value);
+  if (!data) return null;
+  try {
+    return Principal.fromUint8Array(data).toText();
+  } catch {
+    return null;
+  }
+}
+
 function pairEntries(entries) {
   const result = {};
   for (const entry of entries ?? []) {
@@ -148,6 +158,54 @@ export function normalizeNodeOperator(record, warnings = []) {
     rewardableNodes: pairEntries(record?.rewardable_nodes),
     maxRewardableNodes: pairEntries(record?.max_rewardable_nodes),
     ipv6: typeof unwrapOpt(record?.ipv6) === 'string' ? unwrapOpt(record?.ipv6) : null,
+    raw: null,
+  };
+}
+
+export function normalizeSubnetType(value) {
+  const type = unwrapOpt(value);
+  if (!type || typeof type !== 'object') return 'unknown';
+  if (Object.hasOwn(type, 'application')) return 'application';
+  if (Object.hasOwn(type, 'verified_application')) return 'verified_application';
+  if (Object.hasOwn(type, 'system')) return 'system';
+  if (Object.hasOwn(type, 'cloud_engine')) return 'cloud_engine';
+  return 'unknown';
+}
+
+export function normalizeSubnet(record, subnetId, warnings = []) {
+  if (typeof subnetId !== 'string' || subnetId.length === 0) {
+    warnings.push(topologyWarning(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Registry subnet normalization requires a valid subnet ID.',
+    ));
+    return null;
+  }
+
+  const nodeIds = [];
+  for (const member of record?.membership ?? []) {
+    const nodeId = principalBlobToTextStrict(member);
+    if (nodeId) {
+      nodeIds.push(nodeId);
+      continue;
+    }
+
+    warnings.push(topologyWarning(
+      TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+      'Registry subnet membership contained an invalid node principal.',
+      { subnetId },
+    ));
+  }
+
+  return {
+    id: subnetId,
+    type: normalizeSubnetType(record?.subnet_type),
+    replicaVersionId: typeof record?.replica_version_id === 'string' && record.replica_version_id.length > 0
+      ? record.replica_version_id
+      : null,
+    isHalted: Boolean(record?.is_halted),
+    membership: nodeIds,
+    nodeIds,
+    nodeCount: nodeIds.length,
     raw: null,
   };
 }

@@ -7,12 +7,16 @@ import {
   normalizeGps,
   normalizeNodeOperator,
   normalizeNodeProvider,
+  normalizeSubnet,
+  normalizeSubnetType,
 } from '../src/data/topology/topology-normalizers.js';
 import { createTopologyService, loadIcTopology } from '../src/data/topology/topology-service.js';
 
 const providerPrincipal = Principal.fromText('aaaaa-aa');
 const providerId = providerPrincipal.toText();
 const operatorPrincipal = Principal.fromText('2vxsx-fae');
+const subnetPrincipal = Principal.fromText('uuc56-gyb');
+const subnetId = subnetPrincipal.toText();
 
 function principalBlob(principal) {
   return [...principal.toUint8Array()];
@@ -44,6 +48,16 @@ function nodeOperator(overrides = {}) {
     rewardable_nodes: [['type1', 2]],
     max_rewardable_nodes: [['type1', 4]],
     ipv6: ['2001:db8::1'],
+    ...overrides,
+  };
+}
+
+function subnetRecord(overrides = {}) {
+  return {
+    membership: [principalBlob(operatorPrincipal)],
+    replica_version_id: 'replica-1',
+    subnet_type: { application: null },
+    is_halted: false,
     ...overrides,
   };
 }
@@ -120,6 +134,58 @@ test('invalid node operator allowance produces a warning', () => {
   assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.VALIDATION_FAILED);
 });
 
+test('normalizes subnet type variants to stable strings', () => {
+  assert.equal(normalizeSubnetType({ application: null }), 'application');
+  assert.equal(normalizeSubnetType({ verified_application: null }), 'verified_application');
+  assert.equal(normalizeSubnetType({ system: null }), 'system');
+  assert.equal(normalizeSubnetType({ cloud_engine: null }), 'cloud_engine');
+  assert.equal(normalizeSubnetType({ future_type: null }), 'unknown');
+  assert.equal(normalizeSubnetType(null), 'unknown');
+});
+
+test('normalizes subnet membership blobs to principal text node IDs', () => {
+  const warnings = [];
+  const normalized = normalizeSubnet(subnetRecord(), subnetId, warnings);
+
+  assert.equal(normalized.id, subnetId);
+  assert.equal(normalized.type, 'application');
+  assert.equal(normalized.replicaVersionId, 'replica-1');
+  assert.equal(normalized.isHalted, false);
+  assert.deepEqual(normalized.nodeIds, [operatorPrincipal.toText()]);
+  assert.deepEqual(normalized.membership, [operatorPrincipal.toText()]);
+  assert.equal(normalized.nodeCount, 1);
+  assert.equal(normalized.raw, null);
+  assert.deepEqual(warnings, []);
+});
+
+test('subnet node count equals successfully normalized membership length', () => {
+  const otherNode = Principal.fromText('aaaaa-aa');
+  const warnings = [];
+  const normalized = normalizeSubnet(
+    subnetRecord({ membership: [principalBlob(operatorPrincipal), principalBlob(otherNode)] }),
+    subnetId,
+    warnings,
+  );
+
+  assert.deepEqual(normalized.nodeIds, [operatorPrincipal.toText(), otherNode.toText()]);
+  assert.equal(normalized.nodeCount, 2);
+  assert.deepEqual(warnings, []);
+});
+
+test('malformed subnet membership creates a validation warning and is omitted', () => {
+  const warnings = [];
+  const normalized = normalizeSubnet(
+    subnetRecord({ membership: [principalBlob(operatorPrincipal), 'not-a-principal-blob'] }),
+    subnetId,
+    warnings,
+  );
+
+  assert.deepEqual(normalized.nodeIds, [operatorPrincipal.toText()]);
+  assert.equal(normalized.nodeCount, 1);
+  assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.VALIDATION_FAILED);
+  assert.equal(warnings[0].details.subnetId, subnetId);
+});
+
 test('topology service returns partial data when one provider call fails', async () => {
   const otherProvider = Principal.fromText('2vxsx-fae');
   const governance = {
@@ -172,6 +238,155 @@ test('topology service does not require subnet discovery in Candid-safe mode', a
 
   assert.deepEqual(topology.subnets, []);
   assert.deepEqual(topology.nodesById, {});
+});
+
+test('getIcSubnet normalizes Registry Ok subnet responses', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async (request) => {
+        assert.equal(request.subnet_id[0].toText(), subnetId);
+        return { Ok: subnetRecord({ subnet_type: { system: null }, is_halted: true }) };
+      },
+    },
+  });
+
+  const subnet = await service.getIcSubnet({ subnetId });
+
+  assert.equal(subnet.id, subnetId);
+  assert.equal(subnet.type, 'system');
+  assert.equal(subnet.isHalted, true);
+  assert.equal(subnet.nodeCount, 1);
+});
+
+test('getIcSubnet returns null for Registry Err subnet responses', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async () => ({ Err: 'missing subnet' }),
+    },
+  });
+
+  assert.equal(await service.getIcSubnet({ subnetId }), null);
+});
+
+test('getIcSubnets reads known subnet IDs with concurrency limiting', async () => {
+  let active = 0;
+  let maxActive = 0;
+  const subnetIds = [
+    Principal.fromText('uuc56-gyb').toText(),
+    Principal.fromText('aaaaa-aa').toText(),
+    Principal.fromText('2vxsx-fae').toText(),
+  ];
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        active -= 1;
+        return { Ok: subnetRecord() };
+      },
+    },
+    maxConcurrency: 2,
+  });
+
+  const { subnets, warnings } = await service.getIcSubnets({ subnetIds });
+
+  assert.equal(subnets.length, 3);
+  assert.equal(maxActive, 2);
+  assert.deepEqual(warnings, []);
+});
+
+test('getIcSubnets with no IDs throws RAW_REGISTRY_UNAVAILABLE without a raw client', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: { get_subnet: async () => ({ Ok: subnetRecord() }) },
+  });
+
+  await assert.rejects(
+    () => service.getIcSubnets(),
+    (error) => {
+      assert.equal(error instanceof IcTopologyError, true);
+      assert.equal(error.code, TOPOLOGY_ERROR_CODES.RAW_REGISTRY_UNAVAILABLE);
+      return true;
+    },
+  );
+});
+
+test('getIcSubnets with no IDs discovers subnet IDs through raw Registry client', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async (request) => {
+        assert.equal(request.subnet_id[0].toText(), subnetId);
+        return { Ok: subnetRecord() };
+      },
+    },
+    rawRegistryClient: {
+      listSubnetIds: async () => [subnetId],
+    },
+  });
+
+  const { subnets, warnings } = await service.getIcSubnets();
+
+  assert.equal(subnets.length, 1);
+  assert.equal(subnets[0].id, subnetId);
+  assert.deepEqual(warnings, []);
+});
+
+test('getIcSubnets returns warnings for Registry Err subnet responses', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async () => ({ Err: 'missing subnet' }),
+    },
+  });
+
+  const { subnets, warnings } = await service.getIcSubnets({ subnetIds: [subnetId] });
+
+  assert.deepEqual(subnets, []);
+  assert.equal(warnings[0].code, TOPOLOGY_ERROR_CODES.REGISTRY_RESPONSE_ERR);
+});
+
+test('getIcSubnetNodeCounts returns counts by subnet ID', async () => {
+  const service = createTopologyService({
+    governance: {},
+    registry: {
+      get_subnet: async () => ({ Ok: subnetRecord({ replica_version_id: 'replica-2' }) }),
+    },
+  });
+
+  const { countsBySubnetId, warnings } = await service.getIcSubnetNodeCounts({ subnetIds: [subnetId] });
+
+  assert.deepEqual(countsBySubnetId[subnetId], {
+    subnetId,
+    nodeCount: 1,
+    nodeIds: [operatorPrincipal.toText()],
+    type: 'application',
+    replicaVersionId: 'replica-2',
+    isHalted: false,
+  });
+  assert.deepEqual(warnings, []);
+});
+
+test('getIcTopology attaches known subnet records without full subnet discovery', async () => {
+  const service = createTopologyService({
+    governance: {
+      list_node_providers: async () => ({ node_providers: [provider()] }),
+    },
+    registry: {
+      get_node_operators_and_dcs_of_node_provider: async () => ({ Ok: [[dataCenter(), nodeOperator()]] }),
+      get_subnet: async () => ({ Ok: subnetRecord() }),
+    },
+  });
+
+  const topology = await service.getIcTopology({ subnetIds: [subnetId] });
+
+  assert.equal(topology.subnets.length, 1);
+  assert.equal(topology.subnets[0].id, subnetId);
+  assert.equal(topology.subnets[0].nodeCount, 1);
 });
 
 test('getIcNodeProviders does not require Registry topology reads', async () => {

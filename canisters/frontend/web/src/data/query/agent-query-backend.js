@@ -1,13 +1,18 @@
 import { HttpAgent } from '@icp-sdk/core/agent';
+import { createActor as createCmcActor } from '../../../declarations/nns_cmc/index.js';
 import { createActor as createGovernanceActor } from '../../../declarations/nns_governance/index.js';
 import { createActor as createRegistryActor } from '../../../declarations/nns_registry/index.js';
 import {
+  NNS_CMC_CANISTER_ID,
   NNS_GOVERNANCE_CANISTER_ID,
   NNS_REGISTRY_CANISTER_ID,
 } from '../../app/config.js';
+import { createRawRegistryClient } from '../topology/raw-registry-client.js';
 import { createTopologyService } from '../topology/topology-service.js';
 import { IcTopologyError, TOPOLOGY_ERROR_CODES } from '../topology/topology-errors.js';
 import {
+  normalizeCmcDefaultSubnetsResponse,
+  normalizeCmcSubnetLabelsResponse,
   normalizeKnownNeuronNamesResponse,
   normalizeNeuronListResponse,
   normalizeOpenProposalListResponse,
@@ -16,12 +21,13 @@ import {
 const KNOWN_NEURON_CACHE_MS = 60 * 60 * 1000;
 
 export function getPendingProposalsRequestOpt() {
-  return [{ return_self_describing_action: [false] }];
+  return [{ return_self_describing_action: [true] }];
 }
 
 export async function createAgentQueryBackend({
   host,
   local,
+  cmcCanisterId = NNS_CMC_CANISTER_ID,
   governanceCanisterId = NNS_GOVERNANCE_CANISTER_ID,
   registryCanisterId = NNS_REGISTRY_CANISTER_ID,
 } = {}) {
@@ -45,9 +51,11 @@ export async function createAgentQueryBackend({
 
   let governance;
   let registry;
+  let cmc;
   try {
     governance = createGovernanceActor(governanceCanisterId, { agent });
     registry = createRegistryActor(registryCanisterId, { agent });
+    cmc = createCmcActor(cmcCanisterId, { agent });
   } catch (error) {
     throw new IcTopologyError(
       TOPOLOGY_ERROR_CODES.ACTOR_INIT_FAILED,
@@ -56,7 +64,8 @@ export async function createAgentQueryBackend({
     );
   }
 
-  const topologyService = createTopologyService({ governance, registry });
+  const rawRegistryClient = createRawRegistryClient({ agent, registryCanisterId });
+  const topologyService = createTopologyService({ governance, registry, rawRegistryClient });
   let knownNeuronNames = new Map();
   let knownNeuronFetchedAt = 0;
   let knownNeuronRefresh = null;
@@ -120,13 +129,50 @@ export async function createAgentQueryBackend({
     return proposalInfo ? normalizeOpenProposalListResponse([proposalInfo], names)[0] : null;
   }
 
+  async function getCmcSubnetLabels() {
+    let typedResponse;
+    let defaultResponse;
+    try {
+      [typedResponse, defaultResponse] = await Promise.all([
+        cmc.get_subnet_types_to_subnets(),
+        cmc.get_default_subnets(),
+      ]);
+    } catch (error) {
+      throw new IcTopologyError(
+        TOPOLOGY_ERROR_CODES.REGISTRY_CALL_FAILED,
+        'Failed to read CMC subnet placement assignments.',
+        error,
+      );
+    }
+
+    const labelResult = normalizeCmcSubnetLabelsResponse(typedResponse);
+    const defaultResult = normalizeCmcDefaultSubnetsResponse(defaultResponse);
+    const publicSubnetIds = [
+      ...new Set([
+        ...defaultResult.defaultSubnetIds,
+        ...Object.keys(labelResult.labelsBySubnetId),
+      ]),
+    ];
+
+    return {
+      labelsBySubnetId: labelResult.labelsBySubnetId,
+      defaultSubnetIds: defaultResult.defaultSubnetIds,
+      publicSubnetIds,
+      warnings: [...labelResult.warnings, ...defaultResult.warnings],
+    };
+  }
+
   return Object.freeze({
     getNnsNeuron,
     getNnsNeurons,
     getOpenNnsProposals,
     getNnsProposal,
     getIcNodeProviders: topologyService.getIcNodeProviders,
+    getIcSubnet: topologyService.getIcSubnet,
+    getIcSubnets: topologyService.getIcSubnets,
+    getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,
+    getCmcSubnetLabels,
     refreshIcTopology: topologyService.refreshIcTopology,
     clearTopologyCache: topologyService.clearTopologyCache,
   });

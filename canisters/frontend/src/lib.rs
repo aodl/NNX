@@ -8,7 +8,7 @@ use ic_http_certification::{
     HttpRequest, HttpResponse, Method, StatusCode, CERTIFICATE_EXPRESSION_HEADER_NAME,
 };
 use include_dir::{include_dir, Dir};
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, rc::Rc};
 
 thread_local! {
     static HTTP_TREE: Rc<RefCell<HttpCertificationTree>> = Default::default();
@@ -21,6 +21,7 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/public");
 
 const PRIVATE_BUILD_MANIFEST_PATH: &str = "generated/frontend-bundle.json";
+const PLACEHOLDER_BUNDLE_PATH: &str = "/generated/app.placeholder.js";
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
 
@@ -75,13 +76,60 @@ fn collect_assets<'content, 'path>(
     for file in dir.files() {
         let path = file.path().to_string_lossy();
         if path != PRIVATE_BUILD_MANIFEST_PATH {
-            assets.push(Asset::new(path, file.contents()));
+            let contents = if path == "index.html" {
+                Cow::Owned(index_contents(dir, file.contents()))
+            } else {
+                Cow::Borrowed(file.contents())
+            };
+            assets.push(Asset::new(path, contents));
         }
     }
 
     for dir in dir.dirs() {
         collect_assets(dir, assets);
     }
+}
+
+fn index_contents(dir: &Dir<'_>, contents: &[u8]) -> Vec<u8> {
+    let Some(bundle_path) = generated_bundle_path(dir) else {
+        return contents.to_vec();
+    };
+    let index = String::from_utf8_lossy(contents);
+    index
+        .replace(PLACEHOLDER_BUNDLE_PATH, &format!("/{bundle_path}"))
+        .into_bytes()
+}
+
+fn generated_bundle_path(dir: &Dir<'_>) -> Option<String> {
+    let manifest = dir.get_file(PRIVATE_BUILD_MANIFEST_PATH)?;
+    let manifest = std::str::from_utf8(manifest.contents()).ok()?;
+    let bundle_path = json_string_field(manifest, "bundlePath")?;
+
+    (bundle_path.starts_with("generated/app.") && bundle_path.ends_with(".js"))
+        .then_some(bundle_path)
+}
+
+fn json_string_field(json: &str, field: &str) -> Option<String> {
+    let key = format!("\"{field}\"");
+    let mut rest = json.split_once(&key)?.1;
+    rest = rest.split_once(':')?.1.trim_start();
+    let rest = rest.strip_prefix('"')?;
+
+    let mut value = String::new();
+    let mut escaped = false;
+    for char in rest.chars() {
+        if escaped {
+            value.push(char);
+            escaped = false;
+        } else if char == '\\' {
+            escaped = true;
+        } else if char == '"' {
+            return Some(value);
+        } else {
+            value.push(char);
+        }
+    }
+    None
 }
 
 #[cfg(not(test))]
@@ -200,19 +248,27 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     let ic_domains = dir
         .get_file(".well-known/ic-domains")
         .ok_or_else(|| ".well-known/ic-domains is missing from frontend assets".to_string())?;
+    let index_content_length = index_contents(dir, index.contents()).len();
 
     insert_head_asset(
         &mut head_assets,
         "/",
         StatusCode::OK,
-        headers_for_path("index.html", index.contents().len()),
+        headers_for_path("index.html", index_content_length),
         HeadAssetMatchKind::Exact,
     )?;
     insert_head_asset(
         &mut head_assets,
         "/neuron/",
         StatusCode::OK,
-        headers_for_path("index.html", index.contents().len()),
+        headers_for_path("index.html", index_content_length),
+        HeadAssetMatchKind::Fallback,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/proposal/",
+        StatusCode::OK,
+        headers_for_path("index.html", index_content_length),
         HeadAssetMatchKind::Fallback,
     )?;
     insert_head_asset(
@@ -590,6 +646,13 @@ mod tests {
             .map(|(_, value)| value.as_str())
     }
 
+    fn content_length(response: &HttpResponse<'static>) -> usize {
+        header_value(response, "content-length")
+            .expect("response should include content-length")
+            .parse()
+            .expect("content-length should be numeric")
+    }
+
     fn get(path: &str) -> HttpResponse<'static> {
         certify_all_assets();
         serve_asset_with_certificate(b"test-certificate", &HttpRequest::get(path).build())
@@ -617,6 +680,17 @@ mod tests {
     }
 
     #[test]
+    fn root_route_stamps_index_with_generated_bundle_path() {
+        let Some(js_path) = generated_app_path() else {
+            return;
+        };
+        let response = get("/");
+        let body = String::from_utf8_lossy(response.body());
+        assert!(body.contains(&format!("src=\"{js_path}\"")));
+        assert!(!body.contains(PLACEHOLDER_BUNDLE_PATH));
+    }
+
+    #[test]
     fn root_route_returns_index_with_200() {
         let response = get("/");
         assert_eq!(response.status_code(), StatusCode::OK);
@@ -630,6 +704,27 @@ mod tests {
         assert_eq!(response.status_code(), StatusCode::OK);
         assert!(response.body().is_empty());
         assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+    }
+
+    #[test]
+    fn head_index_routes_match_stamped_get_body_length_when_manifest_exists() {
+        if generated_bundle_path(&ASSETS_DIR).is_none() {
+            return;
+        }
+
+        for path in [
+            "/",
+            "/neuron/2947465672511369",
+            "/proposal/2947465672511369",
+        ] {
+            let get_response = get(path);
+            let head_response = head(path);
+
+            assert_eq!(get_response.status_code(), StatusCode::OK);
+            assert_eq!(head_response.status_code(), StatusCode::OK);
+            assert!(head_response.body().is_empty());
+            assert_eq!(content_length(&head_response), get_response.body().len());
+        }
     }
 
     #[test]
