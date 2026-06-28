@@ -4,7 +4,7 @@ import {
   formatTimestampSeconds,
 } from '../app/view-formatters.js';
 import { renderNotFoundPage } from './not-found-page.js';
-import { percentWidth, renderVotePowerBar } from './vote-bar.js';
+import { renderCountdownBar, renderVotePowerBar } from './vote-bar.js';
 
 function clear(root) {
   root.className = 'shell';
@@ -206,12 +206,7 @@ function renderVotingVisual(tally) {
 function renderTimelineVisual(proposal) {
   const body = document.createElement('div');
   body.className = 'proposal-deadline-detail';
-  const bar = document.createElement('div');
-  bar.className = 'countdown-bar proposal-detail-countdown-bar';
-  const fill = document.createElement('span');
-  fill.className = `countdown-fill ${proposal.deadlineUrgencyLevel ?? 'unavailable'}`;
-  fill.style.width = percentWidth(proposal.deadlineUrgencyPercent);
-  bar.append(fill);
+  const bar = renderCountdownBar(proposal, { className: 'proposal-detail-countdown-bar' });
 
   const labels = document.createElement('div');
   labels.className = 'proposal-timeline-labels';

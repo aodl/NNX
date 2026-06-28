@@ -156,6 +156,26 @@ function deadlineUrgency(timeRemainingSecondsValue) {
   return { deadlineUrgencyPercent, deadlineUrgencyLevel };
 }
 
+function deadlineCountdown(createdAtSeconds, deadlineTimestampSeconds) {
+  if (deadlineTimestampSeconds === null) {
+    return { deadlineCountdownPercent: 0 };
+  }
+
+  const created = BigInt(createdAtSeconds ?? 0n);
+  const deadline = BigInt(deadlineTimestampSeconds);
+  if (deadline <= created) return { deadlineCountdownPercent: 0 };
+
+  const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
+  if (nowSeconds <= created) return { deadlineCountdownPercent: 100 };
+  if (nowSeconds >= deadline) return { deadlineCountdownPercent: 0 };
+
+  const duration = deadline - created;
+  const remaining = deadline - nowSeconds;
+  return {
+    deadlineCountdownPercent: Number((remaining * 10_000n) / duration) / 100,
+  };
+}
+
 function selfDescribingValueText(value, depth = 0) {
   const unwrapped = unwrapOpt(value);
   if (unwrapped === null || unwrapped === undefined) return null;
@@ -360,6 +380,7 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
   const status = int32Value(proposalInfo?.status);
   const rewardStatus = int32Value(proposalInfo?.reward_status);
   const action = proposalSelfDescribingAction(proposal);
+  const createdAtSeconds = BigInt(proposalInfo?.proposal_timestamp_seconds ?? 0n);
 
   return {
     id,
@@ -375,12 +396,13 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
     rewardStatusLabel: proposalRewardStatus(rewardStatus),
     proposerNeuronId,
     proposerKnownNeuronName,
-    createdAtSeconds: BigInt(proposalInfo?.proposal_timestamp_seconds ?? 0n),
+    createdAtSeconds,
     decidedAtSeconds: BigInt(proposalInfo?.decided_timestamp_seconds ?? 0n),
     deadlineTimestampSeconds,
     deadlineDate: dateFromTimestampSeconds(deadlineTimestampSeconds),
     timeRemainingSeconds: remainingSeconds,
     ...deadlineUrgency(remainingSeconds),
+    ...deadlineCountdown(createdAtSeconds, deadlineTimestampSeconds),
     tally: normalizeTally(proposalInfo?.latest_tally),
   };
 }

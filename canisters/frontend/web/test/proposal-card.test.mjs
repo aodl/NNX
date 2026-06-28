@@ -75,6 +75,7 @@ function proposalWithTally(tally) {
     statusKind: 'open',
     statusLabel: 'Open',
     deadlineTimestampSeconds: null,
+    deadlineCountdownPercent: 0,
     deadlineUrgencyPercent: 0,
     deadlineUrgencyLevel: 'unavailable',
     tally,
@@ -127,4 +128,18 @@ test('proposal card vote bar shows empty state when no yes/no votes are recorded
   assert.equal(card.querySelector('.vote-split-uncast').style.width, '100%');
   assert.equal(card.querySelector('.vote-split-no').style.width, '0%');
   assert.match(card.getTextContent(), /No votes recorded yet/);
+}));
+
+test('proposal card countdown bar uses countdown percent', () => withTestDocument(() => {
+  const proposal = proposalWithTally(null);
+  proposal.deadlineTimestampSeconds = 200n;
+  proposal.deadlineCountdownPercent = 42.5;
+  proposal.deadlineUrgencyPercent = 99;
+  proposal.deadlineUrgencyLevel = 'warning';
+
+  const card = renderProposalCard(proposal);
+  const fill = card.querySelector('.countdown-fill');
+
+  assert.equal(fill.style.width, '42.5%');
+  assert.equal(fill.className, 'countdown-fill warning');
 }));

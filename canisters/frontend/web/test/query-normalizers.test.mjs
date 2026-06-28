@@ -345,6 +345,22 @@ test('normalizes passed deadline as expired urgency', () => {
     assert.equal(proposal.timeRemainingSeconds, 0);
     assert.equal(proposal.deadlineUrgencyPercent, 100);
     assert.equal(proposal.deadlineUrgencyLevel, 'expired');
+    assert.equal(proposal.deadlineCountdownPercent, 0);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('normalizes deadline countdown from proposal lifetime', () => {
+  const originalNow = Date.now;
+  Date.now = () => 100_000;
+  try {
+    const proposal = normalizeProposalInfo(proposalInfo({
+      proposal_timestamp_seconds: 60n,
+      deadline_timestamp_seconds: [140n],
+    }));
+
+    assert.equal(proposal.deadlineCountdownPercent, 50);
   } finally {
     Date.now = originalNow;
   }

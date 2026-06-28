@@ -1,7 +1,7 @@
 import {
   formatTimeRemaining,
 } from '../app/view-formatters.js';
-import { percentWidth, renderVotePowerBar } from './vote-bar.js';
+import { renderCountdownBar, renderVotePowerBar } from './vote-bar.js';
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -77,12 +77,7 @@ function renderCountdown(proposal) {
   deadline.className = 'proposal-deadline';
   deadline.textContent = formatTimeRemaining(proposal.deadlineTimestampSeconds);
 
-  const bar = document.createElement('div');
-  bar.className = 'countdown-bar';
-  const fill = document.createElement('span');
-  fill.className = `countdown-fill ${proposal.deadlineUrgencyLevel ?? 'unavailable'}`;
-  fill.style.width = percentWidth(proposal.deadlineUrgencyPercent);
-  bar.append(fill);
+  const bar = renderCountdownBar(proposal);
 
   wrap.append(label, deadline, bar);
   return wrap;

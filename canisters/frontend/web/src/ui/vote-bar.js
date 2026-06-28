@@ -21,3 +21,15 @@ export function renderVotePowerBar(tally, { className = '' } = {}) {
   bar.append(yes, uncast, no);
   return bar;
 }
+
+export function renderCountdownBar(proposal, { className = '' } = {}) {
+  const bar = document.createElement('div');
+  bar.className = ['countdown-bar', className].filter(Boolean).join(' ');
+
+  const fill = document.createElement('span');
+  fill.className = `countdown-fill ${proposal?.deadlineUrgencyLevel ?? 'unavailable'}`;
+  fill.style.width = percentWidth(proposal?.deadlineCountdownPercent);
+
+  bar.append(fill);
+  return bar;
+}
