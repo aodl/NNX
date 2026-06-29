@@ -169,6 +169,8 @@ export async function createAgentQueryBackend({
     getNnsProposal,
     getIcNodeProviders: topologyService.getIcNodeProviders,
     getIcSubnet: topologyService.getIcSubnet,
+    getIcSubnetDetails: topologyService.getIcSubnetDetails,
+    getIcNodeDetails: topologyService.getIcNodeDetails,
     getIcSubnets: topologyService.getIcSubnets,
     getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,

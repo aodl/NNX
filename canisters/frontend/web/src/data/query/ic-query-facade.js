@@ -6,6 +6,8 @@ export function createIcQueryFacade({ backend }) {
     getNnsProposal: ({ proposalId }) => backend.getNnsProposal({ proposalId }),
     getIcNodeProviders: () => backend.getIcNodeProviders(),
     getIcSubnet: ({ subnetId }) => backend.getIcSubnet({ subnetId }),
+    getIcSubnetDetails: ({ subnetId }) => backend.getIcSubnetDetails({ subnetId }),
+    getIcNodeDetails: ({ nodeIds }) => backend.getIcNodeDetails({ nodeIds }),
     getIcSubnets: (options) => backend.getIcSubnets(options),
     getIcSubnetNodeCounts: (options) => backend.getIcSubnetNodeCounts(options),
     getIcTopology: (options) => backend.getIcTopology(options),

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createSubnetLoader,
+  groupNodeLocations,
   groupSubnetsByNodeCount,
   labelizeIdentifier,
   specialSubnetLabel,
@@ -95,6 +96,45 @@ test('labels known special subnets by subnet ID', () => {
   assert.equal(specialSubnetLabel('subnet-1'), null);
 });
 
+test('groups node locations by data center GPS', () => {
+  const groups = groupNodeLocations([
+    {
+      nodeId: 'node-1',
+      nodeOperatorId: 'operator-1',
+      nodeProviderId: 'provider-1',
+      dataCenterId: 'dc-1',
+      dataCenterRegion: 'US',
+      dataCenterOwner: 'Owner',
+      gps: { latitude: 37.1, longitude: -122.2 },
+    },
+    {
+      nodeId: 'node-2',
+      nodeOperatorId: 'operator-1',
+      nodeProviderId: 'provider-1',
+      dataCenterId: 'dc-1',
+      dataCenterRegion: 'US',
+      dataCenterOwner: 'Owner',
+      gps: { latitude: 37.1, longitude: -122.2 },
+    },
+    {
+      nodeId: 'node-3',
+      nodeOperatorId: null,
+      nodeProviderId: null,
+      dataCenterId: null,
+      dataCenterRegion: null,
+      dataCenterOwner: null,
+      gps: null,
+    },
+  ]);
+
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].dataCenterId, 'dc-1');
+  assert.equal(groups[0].nodeCount, 2);
+  assert.deepEqual(groups[0].nodeOperatorIds, ['operator-1']);
+  assert.equal(groups[1].nodeCount, 1);
+  assert.equal(groups[1].gps, null);
+});
+
 test('subnet loader attaches CMC labels and preserves warnings', async () => {
   const loader = createSubnetLoader({
     queryFacade: {
@@ -126,6 +166,51 @@ test('subnet loader attaches CMC labels and preserves warnings', async () => {
   assert.equal(result.subnets[1].cmcLabel, 'Fiduciary');
   assert.equal(result.groups.length, 1);
   assert.equal(result.warnings.length, 2);
+});
+
+test('subnet loader loads details with labels and grouped locations', async () => {
+  const loader = createSubnetLoader({
+    queryFacade: {
+      getIcSubnetDetails: async ({ subnetId }) => ({
+        subnet: { id: subnetId, nodeCount: 2, type: 'application' },
+        nodeLocations: [
+          {
+            nodeId: 'node-1',
+            nodeOperatorId: 'operator-1',
+            nodeProviderId: 'provider-1',
+            dataCenterId: 'dc-1',
+            dataCenterRegion: 'EU',
+            dataCenterOwner: 'Owner',
+            gps: { latitude: 50, longitude: 8 },
+          },
+          {
+            nodeId: 'node-2',
+            nodeOperatorId: 'operator-1',
+            nodeProviderId: 'provider-1',
+            dataCenterId: 'dc-1',
+            dataCenterRegion: 'EU',
+            dataCenterOwner: 'Owner',
+            gps: { latitude: 50, longitude: 8 },
+          },
+        ],
+        warnings: [{ code: 'PARTIAL_TOPOLOGY' }],
+      }),
+      getCmcSubnetLabels: async () => ({
+        labelsBySubnetId: { 'subnet-1': 'Fiduciary' },
+        defaultSubnetIds: [],
+        publicSubnetIds: ['subnet-1'],
+        warnings: [],
+      }),
+    },
+  });
+
+  const result = await loader.loadSubnetDetails('subnet-1');
+
+  assert.equal(result.subnet.cmcLabel, 'Fiduciary');
+  assert.equal(result.subnet.visibilityLabel, 'Permissionless');
+  assert.equal(result.locationGroups.length, 1);
+  assert.equal(result.locationGroups[0].nodeCount, 2);
+  assert.equal(result.warnings.length, 1);
 });
 
 test('subnet loader uses special labels only when CMC has no label', async () => {

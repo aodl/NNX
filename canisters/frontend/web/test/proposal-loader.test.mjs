@@ -1,15 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { Principal } from '@icp-sdk/core/principal';
 import { createProposalLoader } from '../src/data/proposal-loader.js';
 import {
+  mergeNodeLocationsByNodeId,
+  referencedNodeCandidatesForProposal,
+} from '../src/data/proposal-node-impacts.js';
+import {
   annotateSubnetsWithProposalImpacts,
-  capitalizeFirstLetter,
   countAffectedProposalsForSubnet,
-  formatSubnetType,
-  groupProposalsByTopic,
-  summarizeProposalStatuses,
+  referencedSubnetsForProposal,
+} from '../src/data/proposal-subnet-impacts.js';
+import {
   summarizeSubnetKinds,
 } from '../src/ui/home-page.js';
+import {
+  groupProposalsByTopic,
+  summarizeProposalStatuses,
+} from '../src/ui/proposal-list-panel.js';
+import {
+  capitalizeFirstLetter,
+  formatSubnetType,
+} from '../src/ui/subnet-formatters.js';
 
 test('loads open proposals newest first', async () => {
   const proposalLoader = createProposalLoader({
@@ -123,4 +135,55 @@ test('annotates subnets and groups with unique affected proposal counts', () => 
     [1, 2],
   );
   assert.equal(annotated.groups[0].affectedProposalCount, 2);
+});
+
+test('finds known subnets referenced by proposal details', () => {
+  const subnetA = 'subnet-a';
+  const subnetB = 'subnet-b';
+
+  const subnets = [
+    { id: subnetA, nodeCount: 13 },
+    { id: subnetB, nodeCount: 34 },
+    { id: 'subnet-c', nodeCount: 1 },
+  ];
+
+  const referenced = referencedSubnetsForProposal({
+    payloadSearchText: `Replace nodes on ${subnetA}`,
+    actionValues: [{ name: 'subnet_id', value: subnetB }],
+  }, subnets);
+
+  assert.deepEqual(referenced.map((subnet) => subnet.id), [subnetA, subnetB]);
+});
+
+test('finds node principals and assigns add remove intent from action value names', () => {
+  const nodeToAdd = Principal.fromText('2vxsx-fae').toText();
+  const nodeToRemove = Principal.fromText('aaaaa-aa').toText();
+
+  const candidates = referencedNodeCandidatesForProposal({
+    actionValues: [
+      { name: 'nodes_to_add', value: nodeToAdd },
+      { name: 'remove_nodes', value: `Remove ${nodeToRemove}` },
+      { name: 'notes', value: 'not-a-principal' },
+    ],
+  });
+
+  assert.deepEqual(candidates.map(({ nodeId, intent }) => ({ nodeId, intent })), [
+    { nodeId: nodeToAdd, intent: 'add' },
+    { nodeId: nodeToRemove, intent: 'remove' },
+  ]);
+});
+
+test('remove intent wins when merging duplicate node locations', () => {
+  const nodeId = Principal.fromText('2vxsx-fae').toText();
+
+  const [merged] = mergeNodeLocationsByNodeId([
+    [{ nodeId, gps: null, proposalIntent: 'add' }],
+    [{ nodeId, gps: { latitude: 1, longitude: 2 }, proposalIntent: 'remove' }],
+  ]);
+
+  assert.deepEqual(merged, {
+    nodeId,
+    gps: { latitude: 1, longitude: 2 },
+    proposalIntent: 'remove',
+  });
 });

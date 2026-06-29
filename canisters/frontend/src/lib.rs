@@ -1,3 +1,4 @@
+use candid::Principal;
 use ic_asset_certification::{
     Asset, AssetCertificationError, AssetConfig, AssetEncoding, AssetFallbackConfig, AssetRouter,
 };
@@ -16,6 +17,7 @@ thread_local! {
         AssetRouter::with_tree(HTTP_TREE.with(|tree| tree.clone()))
     );
     static HEAD_ASSETS: RefCell<HashMap<HeadAssetKey, CertifiedHeadAsset>> = RefCell::new(HashMap::new());
+    static NOT_FOUND_ASSETS: RefCell<HashMap<String, CertifiedHeadAsset>> = RefCell::new(HashMap::new());
 }
 
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/public");
@@ -161,6 +163,10 @@ fn certify_all_assets() {
                     scope: "/proposal/".to_string(),
                     status_code: Some(StatusCode::OK),
                 },
+                AssetFallbackConfig {
+                    scope: "/subnet/".to_string(),
+                    status_code: Some(StatusCode::OK),
+                },
             ],
             aliased_by: vec!["/".to_string()],
             encodings: compressed_encodings.clone(),
@@ -187,6 +193,14 @@ fn certify_all_assets() {
         AssetConfig::File {
             path: "base.css".to_string(),
             content_type: Some("text/css".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
+        AssetConfig::File {
+            path: "map/ne_110m_land.geojson".to_string(),
+            content_type: Some("application/geo+json".to_string()),
             headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
             fallback_for: vec![],
             aliased_by: vec![],
@@ -230,6 +244,9 @@ fn certify_all_assets() {
     if let Err(err) = certify_head_assets(&ASSETS_DIR) {
         ic_cdk::trap(format!("failed to certify frontend HEAD assets: {err}"));
     }
+    if let Err(err) = certify_not_found_assets(&ASSETS_DIR) {
+        ic_cdk::trap(format!("failed to certify frontend 404 assets: {err}"));
+    }
 
     HTTP_TREE.with(|tree| update_certified_data(&tree.borrow().root_hash()));
 }
@@ -245,6 +262,9 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     let base_css = dir
         .get_file("base.css")
         .ok_or_else(|| "base.css is missing from frontend assets".to_string())?;
+    let land_geojson = dir
+        .get_file("map/ne_110m_land.geojson")
+        .ok_or_else(|| "map/ne_110m_land.geojson is missing from frontend assets".to_string())?;
     let ic_domains = dir
         .get_file(".well-known/ic-domains")
         .ok_or_else(|| ".well-known/ic-domains is missing from frontend assets".to_string())?;
@@ -273,9 +293,23 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     )?;
     insert_head_asset(
         &mut head_assets,
+        "/subnet/",
+        StatusCode::OK,
+        headers_for_path("index.html", index_content_length),
+        HeadAssetMatchKind::Fallback,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
         "/base.css",
         StatusCode::OK,
         headers_for_path("base.css", base_css.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/map/ne_110m_land.geojson",
+        StatusCode::OK,
+        headers_for_path("map/ne_110m_land.geojson", land_geojson.contents().len()),
         HeadAssetMatchKind::Exact,
     )?;
     insert_head_asset(
@@ -327,6 +361,23 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     Ok(())
 }
 
+fn certify_not_found_assets(dir: &Dir<'static>) -> Result<(), String> {
+    let not_found = dir
+        .get_file("404.html")
+        .ok_or_else(|| "404.html is missing from frontend assets".to_string())?;
+    let mut assets = HashMap::new();
+    for scope in ["/neuron/", "/proposal/", "/subnet/"] {
+        insert_not_found_asset(
+            &mut assets,
+            scope,
+            not_found.contents().to_vec(),
+            headers_for_path("404.html", not_found.contents().len()),
+        )?;
+    }
+    NOT_FOUND_ASSETS.with(|stored| *stored.borrow_mut() = assets);
+    Ok(())
+}
+
 fn insert_head_asset(
     head_assets: &mut HashMap<HeadAssetKey, CertifiedHeadAsset>,
     path: &str,
@@ -362,6 +413,44 @@ fn insert_head_asset(
             path: path.to_string(),
             match_kind,
         },
+        CertifiedHeadAsset {
+            response,
+            tree_entry,
+        },
+    );
+    Ok(())
+}
+
+fn insert_not_found_asset(
+    not_found_assets: &mut HashMap<String, CertifiedHeadAsset>,
+    scope: &str,
+    body: Vec<u8>,
+    headers: Vec<HeaderField>,
+) -> Result<(), String> {
+    let response = HttpResponse::builder()
+        .with_status_code(StatusCode::NOT_FOUND)
+        .with_body(body)
+        .with_headers(headers)
+        .build();
+    let request = HttpRequest::builder()
+        .with_method(Method::GET)
+        .with_url(scope)
+        .build();
+    let cel_expr = DefaultCelBuilder::full_certification()
+        .with_response_certification(DefaultResponseCertification::response_header_exclusions(
+            vec![],
+        ))
+        .build();
+    let certification = HttpCertification::full(&cel_expr, &request, &response, None)
+        .map_err(|err| err.to_string())?;
+    let tree_entry = HttpCertificationTreeEntry::new(
+        HttpCertificationPath::wildcard(scope.to_string()),
+        certification,
+    );
+
+    HTTP_TREE.with(|tree| tree.borrow_mut().insert(&tree_entry));
+    not_found_assets.insert(
+        scope.to_string(),
         CertifiedHeadAsset {
             response,
             tree_entry,
@@ -467,13 +556,18 @@ fn is_public_route(path: &str) -> bool {
     if path == "/base.css" || path == "/404" || path == "/404.html" {
         return true;
     }
+    if path == "/map/ne_110m_land.geojson" {
+        return true;
+    }
     if path == "/.well-known/ic-domains" {
         return true;
     }
     if path.starts_with("/generated/app.") && path.ends_with(".js") {
         return true;
     }
-    is_valid_id_route(path, "/neuron/") || is_valid_id_route(path, "/proposal/")
+    is_valid_id_route(path, "/neuron/")
+        || is_valid_id_route(path, "/proposal/")
+        || is_valid_principal_route(path, "/subnet/")
 }
 
 fn is_valid_id_route(path: &str, prefix: &str) -> bool {
@@ -486,9 +580,20 @@ fn is_valid_id_route(path: &str, prefix: &str) -> bool {
     id.parse::<u64>().is_ok()
 }
 
+fn is_valid_principal_route(path: &str, prefix: &str) -> bool {
+    let Some(id) = path.strip_prefix(prefix) else {
+        return false;
+    };
+    !id.is_empty() && !id.contains('/') && Principal::from_text(id).is_ok()
+}
+
 fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'static> {
     if req.method() == Method::HEAD {
         return serve_head_not_found(certificate, req);
+    }
+
+    if let Some(response) = serve_scoped_not_found(certificate, req) {
+        return response;
     }
 
     let fallback_req = HttpRequest::get("/missing").build();
@@ -497,6 +602,36 @@ fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'st
             Ok(response) => response,
             Err(err) => asset_error_response(&err),
         }
+    })
+}
+
+fn serve_scoped_not_found(certificate: &[u8], req: &HttpRequest) -> Option<HttpResponse<'static>> {
+    let path = req.get_path().ok()?;
+    NOT_FOUND_ASSETS.with_borrow(|not_found_assets| {
+        for scope in ["/subnet/", "/proposal/", "/neuron/"] {
+            if !path.starts_with(scope) {
+                continue;
+            }
+            let mut asset = not_found_assets.get(scope)?.clone();
+            let witness = HTTP_TREE.with(|tree| {
+                tree.borrow()
+                    .witness(&asset.tree_entry, &path)
+                    .map_err(AssetCertificationError::from)
+            });
+            match witness {
+                Ok(witness) => {
+                    add_v2_certificate_header(
+                        certificate,
+                        &mut asset.response,
+                        &witness,
+                        &asset.tree_entry.path.to_expr_path(),
+                    );
+                    return Some(asset.response);
+                }
+                Err(err) => return Some(asset_error_response(&err)),
+            }
+        }
+        None
     })
 }
 
@@ -572,6 +707,7 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
             || path == "404.html"
             || path == "base.css"
             || path == ".well-known/ic-domains"
+            || path == "map/ne_110m_land.geojson"
         {
             NO_CACHE_ASSET_CACHE_CONTROL
         } else {
@@ -584,6 +720,7 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
         match path {
             "index.html" | "404.html" => "text/html",
             ".well-known/ic-domains" => "text/plain",
+            "map/ne_110m_land.geojson" => "application/geo+json",
             _ if path.ends_with(".js") => "text/javascript",
             _ if path.ends_with(".css") => "text/css",
             _ => "application/octet-stream",
@@ -716,6 +853,7 @@ mod tests {
             "/",
             "/neuron/2947465672511369",
             "/proposal/2947465672511369",
+            "/subnet/uuc56-gyb",
         ] {
             let get_response = get(path);
             let head_response = head(path);
@@ -738,6 +876,14 @@ mod tests {
     #[test]
     fn proposal_route_returns_index_with_200() {
         let response = get("/proposal/2947465672511369");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn subnet_route_returns_index_with_200() {
+        let response = get("/subnet/uuc56-gyb");
         assert_eq!(response.status_code(), StatusCode::OK);
         assert_eq!(header_value(&response, "content-type"), Some("text/html"));
         assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
@@ -768,6 +914,18 @@ mod tests {
     }
 
     #[test]
+    fn malformed_subnet_route_returns_404() {
+        assert_eq!(
+            get("/subnet/not-a-principal").status_code(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get("/subnet/uuc56-gyb/extra").status_code(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
     fn missing_returns_404() {
         assert_eq!(get("/missing").status_code(), StatusCode::NOT_FOUND);
     }
@@ -785,6 +943,10 @@ mod tests {
         let malformed_proposal = head("/proposal/not-a-number");
         assert_eq!(malformed_proposal.status_code(), StatusCode::NOT_FOUND);
         assert!(malformed_proposal.body().is_empty());
+
+        let malformed_subnet = head("/subnet/not-a-principal");
+        assert_eq!(malformed_subnet.status_code(), StatusCode::NOT_FOUND);
+        assert!(malformed_subnet.body().is_empty());
     }
 
     #[test]
@@ -807,6 +969,20 @@ mod tests {
         assert_eq!(
             header_value(&response, "cache-control"),
             Some(IMMUTABLE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn land_geojson_asset_is_served_with_no_cache_headers() {
+        let response = get("/map/ne_110m_land.geojson");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("application/geo+json")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
         );
     }
 
@@ -863,6 +1039,21 @@ mod tests {
         assert_eq!(
             header_value(&response, "cache-control"),
             Some(IMMUTABLE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn head_land_geojson_is_exactly_certified() {
+        let response = head("/map/ne_110m_land.geojson");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("application/geo+json")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
         );
     }
 }

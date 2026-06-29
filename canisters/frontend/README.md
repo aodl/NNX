@@ -21,6 +21,12 @@ GET  /proposal/{decimal_nat64}  -> index.html, 200
 HEAD /proposal/{decimal_nat64}  -> index metadata, 200
 GET  /proposal/not-a-number     -> 404.html, 404
 GET  /proposal/123/extra        -> 404.html, 404
+GET  /subnet/{principal}        -> index.html, 200
+HEAD /subnet/{principal}        -> index metadata, 200
+GET  /subnet/not-a-principal    -> 404.html, 404
+GET  /subnet/{principal}/extra  -> 404.html, 404
+GET  /map/ne_110m_land.geojson  -> Natural Earth 110m land GeoJSON, 200
+HEAD /map/ne_110m_land.geojson  -> GeoJSON metadata, 200
 GET  /missing                -> 404.html, 404
 GET  /generated/app.<hash>.js -> JavaScript asset, 200
 GET  /generated/frontend-bundle.json -> 404
@@ -28,9 +34,13 @@ GET  /generated/frontend-bundle.json -> 404
 
 ## Cache Policy
 
-`index.html`, `404.html`, and `/.well-known/ic-domains` use no-cache headers.
+`index.html`, `404.html`, `/.well-known/ic-domains`, `base.css`, and `map/ne_110m_land.geojson` use no-cache headers.
 
 Content-hashed generated bundles use immutable cache headers.
+
+## Map Asset Attribution
+
+`public/map/ne_110m_land.geojson` is derived from Natural Earth 110m land data. Natural Earth vector map data is public domain; see https://www.naturalearthdata.com/about/terms-of-use/.
 
 ## Build Output
 

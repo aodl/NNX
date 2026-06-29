@@ -8,6 +8,7 @@ import { renderHomePage } from '../ui/home-page.js';
 import { renderNeuronPage } from '../ui/neuron-page.js';
 import { renderNotFoundPage } from '../ui/not-found-page.js';
 import { renderProposalPage } from '../ui/proposal-page.js';
+import { renderSubnetPage } from '../ui/subnet-page.js';
 
 async function createQueryFacade(windowRef) {
   const hostname = windowRef.location.hostname;
@@ -38,7 +39,15 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
 
   if (route.kind === 'proposal') {
     const proposalLoader = createProposalLoader({ queryFacade });
-    await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader });
+    const subnetLoader = createSubnetLoader({ queryFacade });
+    await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader, subnetLoader });
+    return;
+  }
+
+  if (route.kind === 'subnet') {
+    const proposalLoader = createProposalLoader({ queryFacade });
+    const subnetLoader = createSubnetLoader({ queryFacade });
+    await renderSubnetPage(root, { subnetId: route.subnetId, subnetLoader, proposalLoader });
     return;
   }
 

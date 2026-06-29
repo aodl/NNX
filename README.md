@@ -2,7 +2,7 @@
 
 Network Nexus is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
-The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
+The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, `/subnet/{subnet_id}` shows Registry-derived subnet details and node locations, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
 
 ## Tooling
 
@@ -36,6 +36,7 @@ icp network start -d
 /                         open NNS proposals
 /neuron/{neuron_id}
 /proposal/{proposal_id}   NNS proposal detail
+/subnet/{subnet_id}       IC subnet detail and node map
 ```
 
 The landing page reads NNS Governance `get_pending_proposals` as the source of truth for open proposals, Registry subnet records as the source of truth for subnet membership/node counts, and CMC subnet type assignments for placement labels such as `Fiduciary`. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
@@ -62,6 +63,7 @@ The first NNX onchain data proxy lives behind `createIcQueryFacade` and returns 
 const topology = await queryFacade.getIcTopology();
 const providers = await queryFacade.getIcNodeProviders();
 const subnet = await queryFacade.getIcSubnet({ subnetId: 'known-subnet-id' });
+const subnetDetail = await queryFacade.getIcSubnetDetails({ subnetId: 'known-subnet-id' });
 const { subnets, warnings } = await queryFacade.getIcSubnets({
   subnetIds: ['known-subnet-id'],
 });
@@ -82,6 +84,7 @@ queryFacade.clearTopologyCache();
 Candid-safe subnet reads are available when callers already know subnet IDs:
 
 - `getIcSubnet({ subnetId })` reads one Registry `get_subnet` record and returns a normalized subnet or `null` for Registry `Err`.
+- `getIcSubnetDetails({ subnetId })` reads the Registry subnet record, raw Registry node records, Governance node providers, Registry node operators, and Registry data center GPS metadata to return onchain-derived node locations for `/subnet/{subnet_id}`.
 - `getIcSubnets({ subnetIds })` reads known subnet IDs with bounded concurrency and returns `{ subnets, warnings }`.
 - `getIcSubnetNodeCounts({ subnetIds })` returns `{ countsBySubnetId, warnings }` for display code that only needs node counts and basic subnet metadata.
 
@@ -116,6 +119,8 @@ Node location modeling must be derived through the topology relationship, not as
 ```text
 node -> node operator -> data center -> gps
 ```
+
+The subnet detail globe uses checked-in Natural Earth 110m land geometry served by the frontend canister from `map/ne_110m_land.geojson`. This file is only the visual basemap. Subnet membership, node-to-operator relationships, data center metadata, GPS coordinates, and CMC labels remain derived from onchain Registry, Governance, and CMC queries.
 
 Normal test commands:
 

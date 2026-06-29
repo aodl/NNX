@@ -192,6 +192,96 @@ async function loadKnownSubnets({
   return { subnets, warnings };
 }
 
+async function loadNodeRecords(rawRegistryClient, nodeIds, maxConcurrency) {
+  if (!rawRegistryClient?.getNodeRecord) {
+    return {
+      nodeRecords: [],
+      warnings: [topologyWarning(
+        TOPOLOGY_ERROR_CODES.RAW_REGISTRY_UNAVAILABLE,
+        'Subnet node location reads require raw Registry node records.',
+      )],
+    };
+  }
+
+  const results = await mapWithConcurrency(
+    nodeIds,
+    maxConcurrency,
+    async (nodeId) => {
+      try {
+        return { nodeRecord: await rawRegistryClient.getNodeRecord(nodeId), warnings: [] };
+      } catch (error) {
+        return {
+          nodeRecord: null,
+          warnings: [topologyWarning(
+            error?.code ?? TOPOLOGY_ERROR_CODES.REGISTRY_CALL_FAILED,
+            'Failed to read a Registry node record.',
+            { nodeId, message: error?.message ?? String(error) },
+          )],
+        };
+      }
+    },
+  );
+
+  const nodeRecords = [];
+  const warnings = [];
+  for (const result of results) {
+    warnings.push(...(result?.warnings ?? []));
+    if (result?.nodeRecord) nodeRecords.push(result.nodeRecord);
+  }
+
+  return { nodeRecords, warnings };
+}
+
+function buildNodeLocations(nodeIds, nodeRecords, topology, warnings = [], context = {}) {
+  const recordsByNodeId = new Map(nodeRecords.map((record) => [record.nodeId, record]));
+  return nodeIds.map((nodeId) => {
+    const nodeRecord = recordsByNodeId.get(nodeId) ?? null;
+    const nodeOperatorId = nodeRecord?.nodeOperatorId ?? null;
+    const nodeOperator = nodeOperatorId ? topology.nodeOperatorsById[nodeOperatorId] ?? null : null;
+    const dataCenter = nodeOperator?.dataCenterId
+      ? topology.dataCentersById[nodeOperator.dataCenterId] ?? null
+      : null;
+    if (!nodeOperatorId) {
+      warnings.push(topologyWarning(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'Registry node record did not include a node operator.',
+        { ...context, nodeId },
+      ));
+    } else if (!nodeOperator) {
+      warnings.push(topologyWarning(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'Subnet node operator was not found in provider topology metadata.',
+        { ...context, nodeId, nodeOperatorId },
+      ));
+    } else if (!dataCenter) {
+      warnings.push(topologyWarning(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'Subnet node data center was not found in provider topology metadata.',
+        { ...context, nodeId, nodeOperatorId, dataCenterId: nodeOperator.dataCenterId },
+      ));
+    } else if (!dataCenter.gps) {
+      warnings.push(topologyWarning(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'Subnet node data center did not include Registry GPS metadata.',
+        { ...context, nodeId, nodeOperatorId, dataCenterId: dataCenter.id },
+      ));
+    }
+    return {
+      nodeId,
+      nodeOperatorId,
+      nodeProviderId: nodeOperator?.nodeProviderId ?? null,
+      dataCenterId: dataCenter?.id ?? nodeOperator?.dataCenterId ?? null,
+      dataCenterRegion: dataCenter?.region ?? null,
+      dataCenterOwner: dataCenter?.owner ?? null,
+      gps: dataCenter?.gps ?? null,
+    };
+  });
+}
+
+function buildSubnetNodeLocations(subnet, nodeRecords, topology, warnings = []) {
+  return buildNodeLocations(subnet.nodeIds, nodeRecords, topology, warnings, { subnetId: subnet.id });
+}
+
 export async function loadIcTopology({ governance, registry, maxConcurrency = DEFAULT_MAX_CONCURRENCY } = {}) {
   if (!governance?.list_node_providers || !registry?.get_node_operators_and_dcs_of_node_provider) {
     throw new IcTopologyError(
@@ -316,6 +406,56 @@ export function createTopologyService({
     return { countsBySubnetId, warnings };
   }
 
+  async function getIcSubnetDetails({ subnetId } = {}) {
+    const [topology, subnetResult] = await Promise.all([
+      getIcTopology(),
+      getSubnet(registry, subnetId),
+    ]);
+    const subnet = subnetResult.subnet;
+    const warnings = [...topology.warnings, ...subnetResult.warnings];
+
+    if (!subnet) {
+      return { subnet: null, nodeLocations: [], warnings };
+    }
+
+    const nodeRecordResult = await loadNodeRecords(rawRegistryClient, subnet.nodeIds, maxConcurrency);
+    warnings.push(...nodeRecordResult.warnings);
+
+    return {
+      subnet,
+      nodeLocations: buildSubnetNodeLocations(subnet, nodeRecordResult.nodeRecords, topology, warnings),
+      dataCentersById: topology.dataCentersById,
+      nodeOperatorsById: topology.nodeOperatorsById,
+      nodeProvidersById: topology.nodeProvidersById,
+      warnings,
+    };
+  }
+
+  async function getIcNodeDetails({ nodeIds } = {}) {
+    const uniqueNodeIds = [...new Set((nodeIds ?? []).filter((nodeId) => (
+      typeof nodeId === 'string' && nodeId.length > 0
+    )))];
+    const topology = await getIcTopology();
+    const warnings = [...topology.warnings];
+
+    if (uniqueNodeIds.length === 0) {
+      return { nodeLocations: [], warnings };
+    }
+
+    const nodeRecordResult = await loadNodeRecords(rawRegistryClient, uniqueNodeIds, maxConcurrency);
+    warnings.push(...nodeRecordResult.warnings);
+
+    return {
+      nodeLocations: buildNodeLocations(
+        nodeRecordResult.nodeRecords.map((record) => record.nodeId),
+        nodeRecordResult.nodeRecords,
+        topology,
+        warnings,
+      ),
+      warnings,
+    };
+  }
+
   function clearTopologyCache() {
     cache.clear();
   }
@@ -326,6 +466,8 @@ export function createTopologyService({
     getIcSubnet,
     getIcSubnets,
     getIcSubnetNodeCounts,
+    getIcSubnetDetails,
+    getIcNodeDetails,
     refreshIcTopology,
     clearTopologyCache,
   });

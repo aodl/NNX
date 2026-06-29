@@ -10,6 +10,10 @@ test('valid proposal route', () => {
   assert.deepEqual(parseRoute('/proposal/123'), { kind: 'proposal', proposalId: 123n });
 });
 
+test('valid subnet route', () => {
+  assert.deepEqual(parseRoute('/subnet/uuc56-gyb'), { kind: 'subnet', subnetId: 'uuc56-gyb' });
+});
+
 test('root routes to home', () => {
   assert.deepEqual(parseRoute('/'), { kind: 'home' });
 });
@@ -23,6 +27,9 @@ for (const path of [
   '/proposal/abc',
   '/proposal/1/extra',
   '/proposal/-1',
+  '/subnet/',
+  '/subnet/not-a-principal',
+  '/subnet/uuc56-gyb/extra',
 ]) {
   test(`invalid route ${path}`, () => {
     assert.deepEqual(parseRoute(path), { kind: 'not_found' });

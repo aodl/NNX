@@ -3,11 +3,19 @@ import {
   formatTimeRemaining,
   formatTimestampSeconds,
 } from '../app/view-formatters.js';
+import {
+  applyNodeProposalIntents,
+  mergeNodeLocationsByNodeId,
+} from '../data/proposal-node-impacts.js';
+import { referencedSubnetsForProposal } from '../data/proposal-subnet-impacts.js';
+import { groupNodeLocations } from '../data/subnet-loader.js';
 import { renderNotFoundPage } from './not-found-page.js';
+import { renderNodeGlobePanel } from './node-globe-panel.js';
+import { renderSubnetSummaryPanel } from './subnet-summary-panel.js';
 import { renderCountdownBar, renderVotePowerBar } from './vote-bar.js';
 
 function clear(root) {
-  root.className = 'shell';
+  root.className = 'shell detail-shell';
   root.innerHTML = '';
 }
 
@@ -26,9 +34,10 @@ function row(label, value) {
   return item;
 }
 
-function detailSection(title, rows, open = false, aside = null) {
+function detailSection(title, rows, open = false, aside = null, after = []) {
   const details = document.createElement('details');
   details.className = 'detail-section';
+  if (after.length > 0) details.classList.add('with-extra');
   details.open = open;
   const summary = document.createElement('summary');
   const content = document.createElement('span');
@@ -49,6 +58,12 @@ function detailSection(title, rows, open = false, aside = null) {
   list.className = 'detail-list';
   list.append(...rows);
   details.append(summary, list);
+  if (after.length > 0) {
+    const extra = document.createElement('div');
+    extra.className = 'detail-section-extra';
+    extra.append(...after);
+    details.append(extra);
+  }
   return details;
 }
 
@@ -220,7 +235,31 @@ function renderTimelineVisual(proposal) {
   return visualSection('Timeline', 'clock', body);
 }
 
-function renderProposalDetails(proposal) {
+function renderSubnetLoadWarningPanel() {
+  const panel = document.createElement('section');
+  panel.className = 'subnet-summary-panel';
+  const header = document.createElement('div');
+  header.className = 'proposal-panel-header';
+  const title = document.createElement('h2');
+  title.className = 'proposal-panel-title';
+  title.textContent = 'Referenced subnets';
+  header.append(title);
+  const message = document.createElement('p');
+  message.className = 'muted';
+  message.textContent = 'Subnet metadata is unavailable.';
+  panel.append(header, message);
+  return panel;
+}
+
+function renderProposalDetails(
+  proposal,
+  {
+    referencedSubnets = [],
+    proposalLocationGroups = [],
+    subnetLoadError = null,
+    nodeLoadError = null,
+  } = {},
+) {
   const shell = document.createElement('main');
   shell.className = 'proposal-detail-page';
 
@@ -271,27 +310,47 @@ function renderProposalDetails(proposal) {
     actionRows.push(row('Values', proposal.actionDetails));
   }
 
+  const visuals = document.createElement('div');
+  visuals.className = 'proposal-visual-grid';
+  visuals.append(renderVotingVisual(proposal.tally), renderTimelineVisual(proposal));
+
+  const actionExtra = [];
+  if (proposalLocationGroups.length > 0) {
+    actionExtra.push(renderNodeGlobePanel({
+      locationGroups: proposalLocationGroups,
+      title: 'Referenced node map',
+      caption: 'Node locations resolved from onchain Registry metadata.',
+      ariaLabel: 'Globe showing proposal referenced node locations',
+    }));
+  } else if (nodeLoadError) {
+    const warning = document.createElement('p');
+    warning.className = 'muted';
+    warning.textContent = 'Referenced node metadata is unavailable.';
+    actionExtra.push(warning);
+  }
+
+  shell.append(back, header, visuals);
+  if (subnetLoadError) {
+    shell.append(renderSubnetLoadWarningPanel());
+  } else if (referencedSubnets.length > 0) {
+    shell.append(renderSubnetSummaryPanel({
+      subnets: referencedSubnets,
+      title: 'Referenced subnets',
+    }));
+  }
   shell.append(
-    back,
-    header,
-    (() => {
-      const visuals = document.createElement('div');
-      visuals.className = 'proposal-visual-grid';
-      visuals.append(renderVotingVisual(proposal.tally), renderTimelineVisual(proposal));
-      return visuals;
-    })(),
+    detailSection(actionTitle, actionRows, true, null, actionExtra),
     detailSection('Proposer Claims', [
       row('Summary', summary),
     ], false, linkedMetaChip('user', 'Proposer', neuronLink(
       proposal.proposerNeuronId,
       proposal.proposerKnownNeuronName ?? null,
     ))),
-    detailSection(actionTitle, actionRows, true),
   );
   return shell;
 }
 
-export async function renderProposalPage(root, { proposalId, proposalLoader }) {
+export async function renderProposalPage(root, { proposalId, proposalLoader, subnetLoader = null }) {
   clear(root);
   const loading = document.createElement('section');
   loading.className = 'notice';
@@ -321,6 +380,54 @@ export async function renderProposalPage(root, { proposalId, proposalLoader }) {
     return;
   }
 
+  let referencedSubnets = [];
+  let proposalLocationGroups = [];
+  let subnetLoadError = null;
+  let nodeLoadError = null;
+  if (subnetLoader) {
+    try {
+      const subnetPanelData = await subnetLoader.loadSubnetGroups();
+      referencedSubnets = referencedSubnetsForProposal(proposal, subnetPanelData.subnets);
+    } catch (error) {
+      subnetLoadError = error;
+    }
+  }
+
+  const locationLists = [];
+  let referencedNodeCandidates = [];
+  try {
+    const nodeResult = await proposalLoader.loadReferencedNodes(proposal);
+    referencedNodeCandidates = nodeResult.candidates;
+    locationLists.push(nodeResult.nodeLocations);
+  } catch (error) {
+    nodeLoadError = error;
+  }
+
+  if (subnetLoader && referencedSubnets.length > 0) {
+    const subnetResults = await Promise.allSettled(
+      referencedSubnets.map((subnet) => subnetLoader.loadSubnetDetails(subnet.id)),
+    );
+    for (const result of subnetResults) {
+      if (result.status === 'fulfilled') {
+        locationLists.push(applyNodeProposalIntents(
+          result.value.nodeLocations,
+          referencedNodeCandidates,
+        ));
+      } else {
+        subnetLoadError ??= result.reason;
+      }
+    }
+  }
+
+  if (locationLists.length > 0) {
+    proposalLocationGroups = groupNodeLocations(mergeNodeLocationsByNodeId(locationLists));
+  }
+
   clear(root);
-  root.append(renderProposalDetails(proposal));
+  root.append(renderProposalDetails(proposal, {
+    referencedSubnets,
+    proposalLocationGroups,
+    subnetLoadError,
+    nodeLoadError,
+  }));
 }

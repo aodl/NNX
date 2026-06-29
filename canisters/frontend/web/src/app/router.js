@@ -1,4 +1,14 @@
+import { Principal } from '@icp-sdk/core/principal';
+
 const MAX_NAT64 = (1n << 64n) - 1n;
+
+function isPrincipalText(value) {
+  try {
+    return Principal.fromText(value).toText() === value;
+  } catch {
+    return false;
+  }
+}
 
 export function parseRoute(pathname) {
   if (pathname === '/') {
@@ -6,11 +16,15 @@ export function parseRoute(pathname) {
   }
 
   const parts = pathname.split('/').filter(Boolean);
-  if (parts.length !== 2 || !['neuron', 'proposal'].includes(parts[0])) {
+  if (parts.length !== 2 || !['neuron', 'proposal', 'subnet'].includes(parts[0])) {
     return { kind: 'not_found' };
   }
 
   const id = parts[1];
+  if (parts[0] === 'subnet') {
+    return isPrincipalText(id) ? { kind: 'subnet', subnetId: id } : { kind: 'not_found' };
+  }
+
   if (!/^(0|[1-9][0-9]*)$/.test(id)) {
     return { kind: 'not_found' };
   }

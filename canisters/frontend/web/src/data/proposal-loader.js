@@ -1,3 +1,8 @@
+import {
+  applyNodeProposalIntents,
+  referencedNodeCandidatesForProposal,
+} from './proposal-node-impacts.js';
+
 export function createProposalLoader({ queryFacade }) {
   async function loadOpenProposals() {
     const proposals = await queryFacade.getOpenNnsProposals();
@@ -13,5 +18,20 @@ export function createProposalLoader({ queryFacade }) {
     return queryFacade.getNnsProposal({ proposalId });
   }
 
-  return Object.freeze({ loadOpenProposals, loadProposal });
+  async function loadReferencedNodes(proposal) {
+    const candidates = referencedNodeCandidatesForProposal(proposal);
+    if (candidates.length === 0) {
+      return { nodeLocations: [], warnings: [], candidates: [] };
+    }
+    const result = await queryFacade.getIcNodeDetails({
+      nodeIds: candidates.map((candidate) => candidate.nodeId),
+    });
+    return {
+      ...result,
+      candidates,
+      nodeLocations: applyNodeProposalIntents(result.nodeLocations, candidates),
+    };
+  }
+
+  return Object.freeze({ loadOpenProposals, loadProposal, loadReferencedNodes });
 }

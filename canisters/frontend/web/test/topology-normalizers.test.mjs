@@ -389,6 +389,68 @@ test('getIcTopology attaches known subnet records without full subnet discovery'
   assert.equal(topology.subnets[0].nodeCount, 1);
 });
 
+test('getIcSubnetDetails joins subnet nodes to data center GPS', async () => {
+  const service = createTopologyService({
+    governance: {
+      list_node_providers: async () => ({ node_providers: [provider()] }),
+    },
+    registry: {
+      get_node_operators_and_dcs_of_node_provider: async () => ({ Ok: [[dataCenter(), nodeOperator()]] }),
+      get_subnet: async () => ({ Ok: subnetRecord() }),
+    },
+    rawRegistryClient: {
+      getNodeRecord: async (nodeId) => ({
+        nodeId,
+        nodeOperatorId: operatorPrincipal.toText(),
+      }),
+    },
+  });
+
+  const detail = await service.getIcSubnetDetails({ subnetId });
+
+  assert.equal(detail.subnet.id, subnetId);
+  assert.deepEqual(detail.nodeLocations, [{
+    nodeId: operatorPrincipal.toText(),
+    nodeOperatorId: operatorPrincipal.toText(),
+    nodeProviderId: providerId,
+    dataCenterId: 'dc-1',
+    dataCenterRegion: 'Europe',
+    dataCenterOwner: 'Node Provider Ltd',
+    gps: { latitude: 52.52, longitude: 13.405 },
+  }]);
+  assert.deepEqual(detail.warnings, []);
+});
+
+test('getIcNodeDetails joins arbitrary Registry node records to data center GPS', async () => {
+  const service = createTopologyService({
+    governance: {
+      list_node_providers: async () => ({ node_providers: [provider()] }),
+    },
+    registry: {
+      get_node_operators_and_dcs_of_node_provider: async () => ({ Ok: [[dataCenter(), nodeOperator()]] }),
+    },
+    rawRegistryClient: {
+      getNodeRecord: async (nodeId) => ({
+        nodeId,
+        nodeOperatorId: operatorPrincipal.toText(),
+      }),
+    },
+  });
+
+  const detail = await service.getIcNodeDetails({ nodeIds: [operatorPrincipal.toText()] });
+
+  assert.deepEqual(detail.nodeLocations, [{
+    nodeId: operatorPrincipal.toText(),
+    nodeOperatorId: operatorPrincipal.toText(),
+    nodeProviderId: providerId,
+    dataCenterId: 'dc-1',
+    dataCenterRegion: 'Europe',
+    dataCenterOwner: 'Node Provider Ltd',
+    gps: { latitude: 52.52, longitude: 13.405 },
+  }]);
+  assert.deepEqual(detail.warnings, []);
+});
+
 test('getIcNodeProviders does not require Registry topology reads', async () => {
   const service = createTopologyService({
     governance: {

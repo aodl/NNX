@@ -2,6 +2,7 @@ import { Principal } from '@icp-sdk/core/principal';
 import { IcTopologyError, TOPOLOGY_ERROR_CODES } from './topology-errors.js';
 
 const SUBNET_LIST_KEY = 'subnet_list';
+const NODE_RECORD_KEY_PREFIX = 'node_record_';
 const TEXT_ENCODER = new TextEncoder();
 
 function bytes(value) {
@@ -183,6 +184,27 @@ export function decodeSubnetListRecord(data) {
   return subnetIds;
 }
 
+export function decodeNodeRecord(data) {
+  const node = {
+    nodeOperatorId: null,
+  };
+
+  readFields(bytes(data) ?? new Uint8Array(), {
+    15: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.node_operator_id had invalid wire type.');
+      const value = readLengthDelimited(fieldData, offset);
+      node.nodeOperatorId = Principal.fromUint8Array(value.value).toText();
+      return value.offset;
+    },
+  });
+
+  return node;
+}
+
+function nodeRecordKey(nodeId) {
+  return `${NODE_RECORD_KEY_PREFIX}${nodeId}`;
+}
+
 export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
   if (!agent?.query || typeof registryCanisterId !== 'string' || registryCanisterId.length === 0) {
     throw new IcTopologyError(
@@ -260,8 +282,25 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
     }
   }
 
+  async function getNodeRecord(nodeId) {
+    const value = await getRawRegistryValue(nodeRecordKey(nodeId));
+    try {
+      return {
+        nodeId,
+        ...decodeNodeRecord(value),
+      };
+    } catch (error) {
+      throw new IcTopologyError(
+        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        'Failed to decode Registry node record.',
+        error,
+      );
+    }
+  }
+
   return Object.freeze({
     listSubnetIds,
     getSubnetList: listSubnetIds,
+    getNodeRecord,
   });
 }

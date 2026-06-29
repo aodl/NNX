@@ -4,6 +4,7 @@ import { Principal } from '@icp-sdk/core/principal';
 import { TOPOLOGY_ERROR_CODES, IcTopologyError } from '../src/data/topology/topology-errors.js';
 import {
   createRawRegistryClient,
+  decodeNodeRecord,
   decodeRegistryGetValueResponse,
   decodeSubnetListRecord,
 } from '../src/data/topology/raw-registry-client.js';
@@ -46,6 +47,10 @@ function subnetListFixture(subnetIds) {
   return concatBytes(subnetIds.map((id) => bytesField(2, Principal.fromText(id).toUint8Array())));
 }
 
+function nodeRecordFixture(nodeOperatorId) {
+  return bytesField(15, Principal.fromText(nodeOperatorId).toUint8Array());
+}
+
 function getValueResponseFixture(value) {
   return concatBytes([
     varintField(2, 7),
@@ -72,6 +77,14 @@ test('decodes raw Registry get_value protobuf fixture', () => {
   assert.equal(response.error, null);
 });
 
+test('decodes raw Registry node record protobuf fixture', () => {
+  const nodeOperatorId = Principal.fromText('uuc56-gyb').toText();
+
+  assert.deepEqual(decodeNodeRecord(nodeRecordFixture(nodeOperatorId)), {
+    nodeOperatorId,
+  });
+});
+
 test('raw Registry client calls get_value and returns subnet IDs', async () => {
   const subnetIds = [Principal.fromText('uuc56-gyb').toText()];
   let queryCall = null;
@@ -94,6 +107,31 @@ test('raw Registry client calls get_value and returns subnet IDs', async () => {
   assert.equal(queryCall.canisterId, 'rwlgt-iiaaa-aaaaa-aaaaa-cai');
   assert.equal(queryCall.fields.methodName, 'get_value');
   assert.ok(queryCall.fields.arg instanceof Uint8Array);
+});
+
+test('raw Registry client calls get_value and returns node record', async () => {
+  const nodeId = Principal.fromText('2vxsx-fae').toText();
+  const nodeOperatorId = Principal.fromText('uuc56-gyb').toText();
+  let queryCall = null;
+  const client = createRawRegistryClient({
+    registryCanisterId: 'rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    agent: {
+      query: async (canisterId, fields) => {
+        queryCall = { canisterId, fields };
+        return {
+          status: 'replied',
+          reply: {
+            arg: getValueResponseFixture(nodeRecordFixture(nodeOperatorId)),
+          },
+        };
+      },
+    },
+  });
+
+  assert.deepEqual(await client.getNodeRecord(nodeId), { nodeId, nodeOperatorId });
+  assert.equal(queryCall.canisterId, 'rwlgt-iiaaa-aaaaa-aaaaa-cai');
+  assert.equal(queryCall.fields.methodName, 'get_value');
+  assert.ok(new TextDecoder().decode(queryCall.fields.arg).includes(`node_record_${nodeId}`));
 });
 
 test('raw Registry client surfaces get_value Registry errors', async () => {

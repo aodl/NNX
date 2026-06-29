@@ -3,7 +3,7 @@ import { renderNotFoundPage } from './not-found-page.js';
 import { renderTopicTable } from './topic-table.js';
 
 function setNotice(root, title, message) {
-  root.className = 'shell';
+  root.className = 'shell detail-shell';
   root.innerHTML = '';
   const section = document.createElement('section');
   section.className = 'notice';
@@ -57,7 +57,7 @@ export async function renderNeuronPage(root, { neuronId, neuronLoader }) {
     return;
   }
 
-  root.className = 'shell';
+  root.className = 'shell detail-shell';
   root.innerHTML = '';
 
   const topbar = document.createElement('header');
