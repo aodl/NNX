@@ -12,7 +12,7 @@ import { groupNodeLocations } from '../data/subnet-loader.js';
 import { renderNotFoundPage } from './not-found-page.js';
 import { renderNodeGlobePanel } from './node-globe-panel.js';
 import { renderSubnetSummaryPanel } from './subnet-summary-panel.js';
-import { renderCountdownBar, renderVotePowerBar } from './vote-bar.js';
+import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 
 function clear(root) {
   root.className = 'shell detail-shell';
@@ -221,7 +221,7 @@ function renderVotingVisual(tally) {
 function renderTimelineVisual(proposal) {
   const body = document.createElement('div');
   body.className = 'proposal-deadline-detail';
-  const bar = renderCountdownBar(proposal, { className: 'proposal-detail-countdown-bar' });
+  const bar = renderTimelineBar(proposal, { className: 'proposal-detail-countdown-bar' });
 
   const labels = document.createElement('div');
   labels.className = 'proposal-timeline-labels';

@@ -172,7 +172,10 @@ test('normalizes proposal title when present', () => {
   assert.equal(proposal.status, 1);
   assert.equal(proposal.statusLabel, 'Open');
   assert.equal(proposal.statusKind, 'open');
+  assert.equal(proposal.rewardStatus, 1);
   assert.equal(proposal.rewardStatusLabel, 'Accepting votes');
+  assert.equal(proposal.rewardStatusKind, 'accepting-votes');
+  assert.equal(proposal.acceptsVotes, true);
   assert.equal(proposal.decidedAtSeconds, 0n);
   assert.equal(proposal.proposerNeuronId, 456n);
   assert.equal(proposal.proposerKnownNeuronName, null);
@@ -346,12 +349,13 @@ test('normalizes passed deadline as expired urgency', () => {
     assert.equal(proposal.deadlineUrgencyPercent, 100);
     assert.equal(proposal.deadlineUrgencyLevel, 'expired');
     assert.equal(proposal.deadlineCountdownPercent, 0);
+    assert.equal(proposal.deadlineProgressPercent, 100);
   } finally {
     Date.now = originalNow;
   }
 });
 
-test('normalizes deadline countdown from proposal lifetime', () => {
+test('normalizes deadline countdown and timeline progress from proposal lifetime', () => {
   const originalNow = Date.now;
   Date.now = () => 100_000;
   try {
@@ -361,6 +365,30 @@ test('normalizes deadline countdown from proposal lifetime', () => {
     }));
 
     assert.equal(proposal.deadlineCountdownPercent, 50);
+    assert.equal(proposal.deadlineProgressPercent, 50);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
+test('normalizes timeline progress as empty at creation and full at deadline', () => {
+  const originalNow = Date.now;
+  try {
+    Date.now = () => 60_000;
+    const created = normalizeProposalInfo(proposalInfo({
+      proposal_timestamp_seconds: 60n,
+      deadline_timestamp_seconds: [140n],
+    }));
+    assert.equal(created.deadlineCountdownPercent, 100);
+    assert.equal(created.deadlineProgressPercent, 0);
+
+    Date.now = () => 140_000;
+    const deadline = normalizeProposalInfo(proposalInfo({
+      proposal_timestamp_seconds: 60n,
+      deadline_timestamp_seconds: [140n],
+    }));
+    assert.equal(deadline.deadlineCountdownPercent, 0);
+    assert.equal(deadline.deadlineProgressPercent, 100);
   } finally {
     Date.now = originalNow;
   }
@@ -409,4 +437,29 @@ test('preserves BigInt proposal IDs in proposal list response', () => {
 
   assert.equal(proposal.id, 18_446_744_073_709_551_615n);
   assert.equal(proposal.proposerKnownNeuronName, 'Known Proposer');
+});
+
+test('keeps executed proposals that are still accepting votes', () => {
+  const [proposal] = normalizeOpenProposalListResponse([
+    proposalInfo({
+      id: [{ id: 1n }],
+      status: 4,
+      reward_status: 1,
+      decided_timestamp_seconds: 15n,
+    }),
+  ]);
+
+  assert.equal(proposal.id, 1n);
+  assert.equal(proposal.statusLabel, 'Executed');
+  assert.equal(proposal.acceptsVotes, true);
+});
+
+test('filters accepting-votes list by reward status instead of proposal status', () => {
+  const proposals = normalizeOpenProposalListResponse([
+    proposalInfo({ id: [{ id: 1n }], status: 1, reward_status: 2 }),
+    proposalInfo({ id: [{ id: 2n }], status: 4, reward_status: 1 }),
+    proposalInfo({ id: [{ id: 3n }], status: 5, reward_status: 3 }),
+  ]);
+
+  assert.deepEqual(proposals.map((proposal) => proposal.id), [2n]);
 });

@@ -16,12 +16,62 @@ import {
   normalizeKnownNeuronNamesResponse,
   normalizeNeuronListResponse,
   normalizeOpenProposalListResponse,
+  normalizeProposalInfo,
 } from './query-normalizers.js';
 
 const KNOWN_NEURON_CACHE_MS = 60 * 60 * 1000;
+const PROPOSAL_REWARD_STATUS_ACCEPT_VOTES = 1;
+const PROPOSAL_PAGE_LIMIT = 100;
 
-export function getPendingProposalsRequestOpt() {
-  return [{ return_self_describing_action: [true] }];
+export function listAcceptingVotesProposalsRequest(beforeProposalId = null) {
+  return {
+    include_reward_status: [PROPOSAL_REWARD_STATUS_ACCEPT_VOTES],
+    omit_large_fields: [false],
+    before_proposal: beforeProposalId === null ? [] : [{ id: beforeProposalId }],
+    limit: PROPOSAL_PAGE_LIMIT,
+    exclude_topic: [],
+    include_all_manage_neuron_proposals: [],
+    include_status: [],
+    return_self_describing_action: [true],
+  };
+}
+
+function proposalInfoId(proposalInfo) {
+  const idOpt = proposalInfo?.id;
+  const id = Array.isArray(idOpt) ? idOpt[0]?.id : idOpt?.id;
+  return id === null || id === undefined ? null : BigInt(id);
+}
+
+export async function listAcceptingVotesProposalInfos({ governance }) {
+  const proposals = [];
+  const seenProposalIds = new Set();
+  let beforeProposalId = null;
+
+  while (true) {
+    const response = await governance.list_proposals(
+      listAcceptingVotesProposalsRequest(beforeProposalId),
+    );
+    const page = response?.proposal_info ?? [];
+    if (page.length === 0) break;
+
+    let nextBeforeProposalId = null;
+    for (const proposalInfo of page) {
+      const id = proposalInfoId(proposalInfo);
+      if (id === null) continue;
+      nextBeforeProposalId = id;
+      const key = id.toString();
+      if (!seenProposalIds.has(key)) {
+        seenProposalIds.add(key);
+        proposals.push(proposalInfo);
+      }
+    }
+
+    if (page.length < PROPOSAL_PAGE_LIMIT || nextBeforeProposalId === null) break;
+    if (beforeProposalId !== null && nextBeforeProposalId === beforeProposalId) break;
+    beforeProposalId = nextBeforeProposalId;
+  }
+
+  return proposals;
 }
 
 export async function createAgentQueryBackend({
@@ -114,7 +164,7 @@ export async function createAgentQueryBackend({
 
   async function getOpenNnsProposals() {
     const [response, names] = await Promise.all([
-      governance.get_pending_proposals(getPendingProposalsRequestOpt()),
+      listAcceptingVotesProposalInfos({ governance }),
       getKnownNeuronNames(),
     ]);
     return normalizeOpenProposalListResponse(response, names);
@@ -126,7 +176,7 @@ export async function createAgentQueryBackend({
       getKnownNeuronNames(),
     ]);
     const proposalInfo = Array.isArray(response) ? (response[0] ?? null) : response ?? null;
-    return proposalInfo ? normalizeOpenProposalListResponse([proposalInfo], names)[0] : null;
+    return proposalInfo ? normalizeProposalInfo(proposalInfo, names) : null;
   }
 
   async function getCmcSubnetLabels() {

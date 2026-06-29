@@ -61,4 +61,4 @@ NNS Governance declarations are checked in under:
 canisters/frontend/web/declarations/nns_governance/
 ```
 
-The declaration is browser-compatible and scoped to the current `list_neurons`, `list_known_neurons`, `get_pending_proposals`, and `get_proposal_info` query use.
+The declaration is browser-compatible and scoped to the current `list_neurons`, `list_known_neurons`, `list_node_providers`, `list_proposals`, and `get_proposal_info` query use.

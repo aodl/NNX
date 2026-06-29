@@ -83,15 +83,35 @@ function proposalStatus(value) {
 function proposalRewardStatus(value) {
   switch (int32Value(value)) {
     case 1:
-      return 'Accepting votes';
+      return {
+        rewardStatusLabel: 'Accepting votes',
+        rewardStatusKind: 'accepting-votes',
+        acceptsVotes: true,
+      };
     case 2:
-      return 'Ready to settle';
+      return {
+        rewardStatusLabel: 'Ready to settle',
+        rewardStatusKind: 'ready-to-settle',
+        acceptsVotes: false,
+      };
     case 3:
-      return 'Settled';
+      return {
+        rewardStatusLabel: 'Settled',
+        rewardStatusKind: 'settled',
+        acceptsVotes: false,
+      };
     case 4:
-      return 'Ineligible';
+      return {
+        rewardStatusLabel: 'Ineligible',
+        rewardStatusKind: 'ineligible',
+        acceptsVotes: false,
+      };
     default:
-      return 'Unknown';
+      return {
+        rewardStatusLabel: 'Unknown',
+        rewardStatusKind: 'unknown',
+        acceptsVotes: false,
+      };
   }
 }
 
@@ -158,21 +178,29 @@ function deadlineUrgency(timeRemainingSecondsValue) {
 
 function deadlineCountdown(createdAtSeconds, deadlineTimestampSeconds) {
   if (deadlineTimestampSeconds === null) {
-    return { deadlineCountdownPercent: 0 };
+    return { deadlineCountdownPercent: 0, deadlineProgressPercent: 0 };
   }
 
   const created = BigInt(createdAtSeconds ?? 0n);
   const deadline = BigInt(deadlineTimestampSeconds);
-  if (deadline <= created) return { deadlineCountdownPercent: 0 };
+  if (deadline <= created) {
+    return { deadlineCountdownPercent: 0, deadlineProgressPercent: 100 };
+  }
 
   const nowSeconds = BigInt(Math.floor(Date.now() / 1000));
-  if (nowSeconds <= created) return { deadlineCountdownPercent: 100 };
-  if (nowSeconds >= deadline) return { deadlineCountdownPercent: 0 };
+  if (nowSeconds <= created) {
+    return { deadlineCountdownPercent: 100, deadlineProgressPercent: 0 };
+  }
+  if (nowSeconds >= deadline) {
+    return { deadlineCountdownPercent: 0, deadlineProgressPercent: 100 };
+  }
 
   const duration = deadline - created;
   const remaining = deadline - nowSeconds;
+  const elapsed = nowSeconds - created;
   return {
     deadlineCountdownPercent: Number((remaining * 10_000n) / duration) / 100,
+    deadlineProgressPercent: Number((elapsed * 10_000n) / duration) / 100,
   };
 }
 
@@ -393,7 +421,7 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
     status,
     ...proposalStatus(status),
     rewardStatus,
-    rewardStatusLabel: proposalRewardStatus(rewardStatus),
+    ...proposalRewardStatus(rewardStatus),
     proposerNeuronId,
     proposerKnownNeuronName,
     createdAtSeconds,
@@ -408,7 +436,9 @@ export function normalizeProposalInfo(proposalInfo, knownNeuronNames = new Map()
 }
 
 export function normalizeOpenProposalListResponse(response, knownNeuronNames = new Map()) {
-  return (response ?? []).map((proposalInfo) => normalizeProposalInfo(proposalInfo, knownNeuronNames));
+  return (response ?? [])
+    .map((proposalInfo) => normalizeProposalInfo(proposalInfo, knownNeuronNames))
+    .filter((proposal) => proposal.acceptsVotes);
 }
 
 export function normalizeCmcSubnetLabelsResponse(response) {

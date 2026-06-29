@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { renderProposalCard } from '../src/ui/proposal-card.js';
+import { renderTimelineBar } from '../src/ui/vote-bar.js';
 
 class TestElement {
   constructor(tagName) {
@@ -74,6 +75,8 @@ function proposalWithTally(tally) {
     title: 'Proposal title',
     statusKind: 'open',
     statusLabel: 'Open',
+    rewardStatusKind: 'accepting-votes',
+    rewardStatusLabel: 'Accepting votes',
     deadlineTimestampSeconds: null,
     deadlineCountdownPercent: 0,
     deadlineUrgencyPercent: 0,
@@ -130,16 +133,40 @@ test('proposal card vote bar shows empty state when no yes/no votes are recorded
   assert.match(card.getTextContent(), /No votes recorded yet/);
 }));
 
-test('proposal card countdown bar uses countdown percent', () => withTestDocument(() => {
+test('proposal card timeline bar uses elapsed deadline progress percent', () => withTestDocument(() => {
   const proposal = proposalWithTally(null);
   proposal.deadlineTimestampSeconds = 200n;
   proposal.deadlineCountdownPercent = 42.5;
+  proposal.deadlineProgressPercent = 57.5;
   proposal.deadlineUrgencyPercent = 99;
   proposal.deadlineUrgencyLevel = 'warning';
 
   const card = renderProposalCard(proposal);
   const fill = card.querySelector('.countdown-fill');
 
-  assert.equal(fill.style.width, '42.5%');
+  assert.equal(fill.style.width, '57.5%');
   assert.equal(fill.className, 'countdown-fill warning');
+}));
+
+test('proposal card shows vote acceptance instead of execution status', () => withTestDocument(() => {
+  const proposal = proposalWithTally(null);
+  proposal.statusKind = 'executed';
+  proposal.statusLabel = 'Executed';
+
+  const card = renderProposalCard(proposal);
+  const status = card.querySelector('.proposal-status');
+
+  assert.equal(status.textContent, 'Accepting votes');
+  assert.equal(status.className, 'proposal-status accepting-votes');
+}));
+
+test('timeline progress bar uses elapsed deadline progress percent', () => withTestDocument(() => {
+  const bar = renderTimelineBar({
+    deadlineCountdownPercent: 90,
+    deadlineProgressPercent: 10,
+    deadlineUrgencyLevel: 'safe',
+  });
+  const fill = bar.querySelector('.countdown-fill');
+
+  assert.equal(fill.style.width, '10%');
 }));

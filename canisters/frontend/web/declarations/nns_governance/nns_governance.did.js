@@ -1,6 +1,6 @@
 // Browser-compatible, reduced declaration for the NNS Governance canister.
 // Source: https://github.com/dfinity/ic/blob/master/rs/nns/governance/canister/governance.did
-// Scope: this app only calls the `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info` queries. The record shapes below keep
+// Scope: this app only calls the `list_neurons`, `list_known_neurons`, `list_node_providers`, `list_proposals`, and `get_proposal_info` queries. The record shapes below keep
 // the request fields we send and the response fields consumed by query-normalizers.js;
 // extra upstream response fields are intentionally omitted from this checked-in browser declaration.
 export const idlFactory = ({ IDL }) => {
@@ -132,20 +132,26 @@ export const idlFactory = ({ IDL }) => {
     proposal: IDL.Opt(Proposal),
     proposer: IDL.Opt(NeuronId),
   });
-  const GetPendingProposalsRequest = IDL.Record({
+  const ListProposalInfoRequest = IDL.Record({
+    include_reward_status: IDL.Vec(IDL.Int32),
+    omit_large_fields: IDL.Opt(IDL.Bool),
+    before_proposal: IDL.Opt(ProposalId),
+    limit: IDL.Nat32,
+    exclude_topic: IDL.Vec(IDL.Int32),
+    include_all_manage_neuron_proposals: IDL.Opt(IDL.Bool),
+    include_status: IDL.Vec(IDL.Int32),
     return_self_describing_action: IDL.Opt(IDL.Bool),
+  });
+  const ListProposalInfoResponse = IDL.Record({
+    proposal_info: IDL.Vec(ProposalInfo),
   });
 
   return IDL.Service({
     list_neurons: IDL.Func([ListNeurons], [ListNeuronsResponse], ['query']),
     list_known_neurons: IDL.Func([], [ListKnownNeuronsResponse], ['query']),
     list_node_providers: IDL.Func([], [ListNodeProvidersResponse], ['query']),
-    get_pending_proposals: IDL.Func(
-      [IDL.Opt(GetPendingProposalsRequest)],
-      [IDL.Vec(ProposalInfo)],
-      ['query'],
-    ),
     get_proposal_info: IDL.Func([IDL.Nat64], [IDL.Opt(ProposalInfo)], ['query']),
+    list_proposals: IDL.Func([ListProposalInfoRequest], [ListProposalInfoResponse], ['query']),
   });
 };
 

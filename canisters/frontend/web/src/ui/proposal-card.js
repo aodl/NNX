@@ -1,7 +1,7 @@
 import {
   formatTimeRemaining,
 } from '../app/view-formatters.js';
-import { renderCountdownBar, renderVotePowerBar } from './vote-bar.js';
+import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 
 function icon(name) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -77,7 +77,7 @@ function renderCountdown(proposal) {
   deadline.className = 'proposal-deadline';
   deadline.textContent = formatTimeRemaining(proposal.deadlineTimestampSeconds);
 
-  const bar = renderCountdownBar(proposal);
+  const bar = renderTimelineBar(proposal);
 
   wrap.append(label, deadline, bar);
   return wrap;
@@ -96,8 +96,8 @@ export function renderProposalCard(proposal) {
   title.textContent = proposal.title;
 
   const status = document.createElement('span');
-  status.className = `proposal-status ${proposal.statusKind ?? 'unknown'}`;
-  status.textContent = proposal.statusLabel ?? 'Unknown';
+  status.className = `proposal-status ${proposal.rewardStatusKind ?? proposal.statusKind ?? 'unknown'}`;
+  status.textContent = proposal.rewardStatusLabel ?? proposal.statusLabel ?? 'Unknown';
 
   const metrics = document.createElement('div');
   metrics.className = 'proposal-card-metrics';

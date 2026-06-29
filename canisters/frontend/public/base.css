@@ -1141,7 +1141,8 @@ h2 {
   white-space: nowrap;
 }
 
-.proposal-status.open {
+.proposal-status.open,
+.proposal-status.accepting-votes {
   border-color: #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;

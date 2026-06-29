@@ -39,13 +39,13 @@ icp network start -d
 /subnet/{subnet_id}       IC subnet detail and node map
 ```
 
-The landing page reads NNS Governance `get_pending_proposals` as the source of truth for open proposals, Registry subnet records as the source of truth for subnet membership/node counts, and CMC subnet type assignments for placement labels such as `Fiduciary`. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
+The landing page reads NNS Governance `list_proposals` filtered to `PROPOSAL_REWARD_STATUS_ACCEPT_VOTES` as the source of truth for proposals still accepting votes, Registry subnet records as the source of truth for subnet membership/node counts, and CMC subnet type assignments for placement labels such as `Fiduciary`. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
 
 ## Query Architecture
 
 Application and UI modules do not import actors, agents, or Candid declarations directly. They depend on `createIcQueryFacade`.
 
-The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and checked-in reduced NNS Governance, Registry, and CMC declarations. It calls Governance `list_neurons`, `list_known_neurons`, `list_node_providers`, `get_pending_proposals`, and `get_proposal_info`, Registry topology queries, raw Registry `subnet_list` discovery, and CMC `get_subnet_types_to_subnets`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
+The current backend is `agent-query-backend.js`, which uses `@icp-sdk/core/agent` and checked-in reduced NNS Governance, Registry, and CMC declarations. It calls Governance `list_neurons`, `list_known_neurons`, `list_node_providers`, `list_proposals`, and `get_proposal_info`, Registry topology queries, raw Registry `subnet_list` discovery, and CMC `get_subnet_types_to_subnets`. A future `ic-query` backend can replace this module without changing UI or domain call sites.
 
 Mainnet canister IDs:
 
