@@ -23,7 +23,7 @@ function membershipUnavailableIssue(context, nodeId) {
     code: PROPOSAL_ISSUE_CODES.API_BOUNDARY_MEMBERSHIP_UNAVAILABLE,
     severity: 'manual_review',
     title: 'API boundary membership unavailable',
-    message: 'NNX cannot verify current API boundary membership because no normalized onchain membership source is implemented yet.',
+    message: 'NNX cannot verify current API boundary membership from certified subnet state for this node.',
     affected: { nodeIds: [nodeId] },
     confidence: 'medium',
   });
@@ -52,6 +52,17 @@ export const apiBoundaryNodeAnalyzer = Object.freeze({
             affected: { nodeIds: [nodeId] },
           }));
           continue;
+        }
+        if (!boundaryIdsKnown) {
+          issues.push(membershipUnavailableIssue(context, nodeId));
+        } else if (isBoundary(context, nodeId)) {
+          issues.push(createIssue({
+            ...common,
+            code: PROPOSAL_ISSUE_CODES.API_BOUNDARY_ADD_NODE_ALREADY_API_BOUNDARY,
+            title: 'Node is already API boundary',
+            message: 'Certified subnet state already lists this node as an API boundary node.',
+            affected: { nodeIds: [nodeId] },
+          }));
         }
         const current = context.analysisContext.findCurrentSubnetForNode(nodeId);
         if (current.status === 'assigned') {
@@ -131,7 +142,7 @@ export const apiBoundaryNodeAnalyzer = Object.freeze({
         if (context.intent.actionKind === 'AddApiBoundaryNodes' && !isBoundary(context, nodeId)) {
           issues.push(createIssue({
             ...common,
-            code: PROPOSAL_ISSUE_CODES.API_BOUNDARY_EXECUTED_ADD_NODE_NOT_BOUNDARY,
+            code: PROPOSAL_ISSUE_CODES.EXECUTED_ADD_API_BOUNDARY_NODE_NOT_BOUNDARY,
             title: 'Added node is not API boundary',
             message: 'This executed proposal added an API boundary node, but it is not in the current API boundary set.',
             affected: { nodeIds: [nodeId] },
@@ -140,7 +151,7 @@ export const apiBoundaryNodeAnalyzer = Object.freeze({
         if (context.intent.actionKind === 'RemoveApiBoundaryNodes' && isBoundary(context, nodeId)) {
           issues.push(createIssue({
             ...common,
-            code: PROPOSAL_ISSUE_CODES.API_BOUNDARY_EXECUTED_REMOVE_NODE_STILL_BOUNDARY,
+            code: PROPOSAL_ISSUE_CODES.EXECUTED_REMOVE_API_BOUNDARY_NODE_STILL_BOUNDARY,
             title: 'Removed node is still API boundary',
             message: 'This executed proposal removed an API boundary node, but it is still in the current API boundary set.',
             affected: { nodeIds: [nodeId] },

@@ -22,6 +22,8 @@ jobs:
       - run: cargo fmt --all -- --check
       - run: cargo test --workspace
       - run: npm run build:frontend
-      - run: cargo build --package nnx-frontend --target wasm32-unknown-unknown --release
+      - run: cargo build --workspace --target wasm32-unknown-unknown --release
+      - run: ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_test.wasm ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
+      - run: ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
       - run: node tools/scripts/check-frontend-artifacts.mjs
       - run: node tools/scripts/check-boundaries.mjs

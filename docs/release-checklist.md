@@ -25,6 +25,17 @@ npm run smoke:node-metrics-proxy -- --network local --subnet-id <subnet-principa
 npm run smoke:node-metrics-proxy -- --network ic --subnet-id <subnet-principal>
 ```
 
+Certified API-boundary membership smoke uses only certified subnet state for
+caller-supplied node IDs. A stable positive member is intentionally not
+hardcoded; release operators can provide one with
+`NNX_API_BOUNDARY_MEMBER_CANARY_NODE_ID`.
+
+```sh
+npm run smoke:api-boundary-membership -- --network ic --node-id <known-non-member> --expect-non-member <known-non-member>
+NNX_API_BOUNDARY_MEMBER_CANARY_NODE_ID=<known-boundary-node> npm run smoke:api-boundary-membership -- --network ic --node-id <known-non-member>
+NNX_ALLOW_UNSUPPORTED_LOCAL_CERTIFIED_STATE=1 npm run smoke:api-boundary-membership -- --network local --node-id <local-node-id>
+```
+
 Verify:
 
 - `canisters/frontend/public/index.html` still references `/generated/app.placeholder.js`
@@ -36,6 +47,8 @@ Verify:
   `MANAGEMENT_CANISTER_DECODE_FAILED`
 - invalid node metrics range still returns typed `INVALID_TIME_RANGE`; this is a
   separate check from the valid management-call path smoke
+- API-boundary membership smoke prints `available`, returned member node IDs,
+  warnings, and errors; unavailable mainnet certified-state reads are failures
 - manual browser smoke passes for WebGL/globe
 - `node tools/scripts/check-frontend-artifacts.mjs`
 - `node tools/scripts/check-boundaries.mjs`

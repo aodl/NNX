@@ -18,7 +18,13 @@ test('query facade exposes API boundary membership through single boundary metho
       getIcSubnetNodeCounts: async () => ({}),
       getIcTopology: async () => ({}),
       getNodeMetricsHistory: async () => ({}),
-      getApiBoundaryNodeIds: async ({ nodeIds }) => ({ apiBoundaryNodeIds: nodeIds, available: true, warnings: [] }),
+      getApiBoundaryNodeIds: async ({ nodeIds }) => ({
+        available: true,
+        nodeIds,
+        apiBoundaryNodeIds: nodeIds,
+        errors: [],
+        warnings: [],
+      }),
       getCmcSubnetLabels: async () => ({}),
       clearTopologyCache: () => {},
       refreshIcTopology: async () => ({}),
@@ -27,8 +33,10 @@ test('query facade exposes API boundary membership through single boundary metho
 
   const result = await facade.getApiBoundaryNodeIds({ nodeIds: ['2vxsx-fae'] });
   assert.deepEqual(result, {
-    apiBoundaryNodeIds: ['2vxsx-fae'],
     available: true,
+    nodeIds: ['2vxsx-fae'],
+    apiBoundaryNodeIds: ['2vxsx-fae'],
+    errors: [],
     warnings: [],
   });
 });

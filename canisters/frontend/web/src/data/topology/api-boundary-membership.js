@@ -12,6 +12,7 @@ const ENCODER = new TextEncoder();
 const API_BOUNDARY_ROOT = ENCODER.encode('api_boundary_nodes');
 const DOMAIN_FIELD = ENCODER.encode('domain');
 const IPV4_FIELD = ENCODER.encode('ipv4_address');
+const IPV6_FIELD = ENCODER.encode('ipv6_address');
 
 function uniquePrincipalNodeIds(nodeIds = [], warnings = []) {
   const valid = [];
@@ -44,7 +45,7 @@ function boundaryPath(nodeId, field) {
 function lookupPath(certificate, path, nodeId, fieldName, warnings) {
   const result = certificate.lookup_path(path);
   if (result.status === LookupPathStatus.Found) {
-    return lookupResultToBuffer(result) ?? new Uint8Array();
+    return { found: true, value: lookupResultToBuffer(result) ?? new Uint8Array(), unavailable: false };
   }
   if (result.status !== LookupPathStatus.Absent) {
     warnings.push(topologyWarning(
@@ -52,8 +53,19 @@ function lookupPath(certificate, path, nodeId, fieldName, warnings) {
       'Certified API boundary membership path was not fully known.',
       { nodeId, field: fieldName, status: result.status },
     ));
+    return { found: false, value: null, unavailable: true };
   }
-  return null;
+  return { found: false, value: null, unavailable: false };
+}
+
+function result({ apiBoundaryNodeIds = [], available, warnings = [], errors = [] }) {
+  return {
+    available,
+    nodeIds: apiBoundaryNodeIds,
+    apiBoundaryNodeIds,
+    errors,
+    warnings,
+  };
 }
 
 export async function readApiBoundaryMembership({
@@ -65,31 +77,33 @@ export async function readApiBoundaryMembership({
   const warnings = [];
   const validNodeIds = uniquePrincipalNodeIds(nodeIds, warnings);
   if (validNodeIds.length === 0) {
-    return { apiBoundaryNodeIds: [], available: true, warnings };
+    return result({ apiBoundaryNodeIds: [], available: true, warnings });
   }
   if (!agent?.readSubnetState || !agent.rootKey) {
-    return {
+    return result({
       apiBoundaryNodeIds: [],
       available: false,
       warnings: [topologyWarning(
         TOPOLOGY_ERROR_CODES.RAW_REGISTRY_UNAVAILABLE,
         'Certified API boundary membership reads require an agent with readSubnetState and a root key.',
       ), ...warnings],
-    };
+    });
   }
 
   const subnetPrincipal = Principal.fromText(subnetId);
   const pathsByNode = new Map(validNodeIds.map((nodeId) => [nodeId, {
     domain: boundaryPath(nodeId, DOMAIN_FIELD),
     ipv4: boundaryPath(nodeId, IPV4_FIELD),
+    ipv6: boundaryPath(nodeId, IPV6_FIELD),
   }]));
-  const paths = [...pathsByNode.values()].flatMap((entry) => [entry.domain, entry.ipv4]);
+  const paths = [...pathsByNode.values()]
+    .flatMap((entry) => [entry.domain, entry.ipv4, entry.ipv6]);
 
   let response;
   try {
     response = await agent.readSubnetState(subnetPrincipal, { paths });
   } catch (error) {
-    return {
+    return result({
       apiBoundaryNodeIds: [],
       available: false,
       warnings: [topologyWarning(
@@ -97,7 +111,7 @@ export async function readApiBoundaryMembership({
         'Failed to read certified API boundary membership state.',
         { message: error?.message ?? String(error) },
       ), ...warnings],
-    };
+    });
   }
 
   let certificate;
@@ -109,7 +123,7 @@ export async function readApiBoundaryMembership({
       agent,
     });
   } catch (error) {
-    return {
+    return result({
       apiBoundaryNodeIds: [],
       available: false,
       warnings: [topologyWarning(
@@ -117,19 +131,30 @@ export async function readApiBoundaryMembership({
         'Failed to verify certified API boundary membership state.',
         { message: error?.message ?? String(error) },
       ), ...warnings],
-    };
+    });
   }
 
   const apiBoundaryNodeIds = [];
+  let unavailable = false;
   for (const [nodeId, nodePaths] of pathsByNode.entries()) {
     const domain = lookupPath(certificate, nodePaths.domain, nodeId, 'domain', warnings);
     const ipv4 = lookupPath(certificate, nodePaths.ipv4, nodeId, 'ipv4_address', warnings);
-    if (domain !== null || ipv4 !== null) apiBoundaryNodeIds.push(nodeId);
+    const ipv6 = lookupPath(certificate, nodePaths.ipv6, nodeId, 'ipv6_address', warnings);
+    if (domain.unavailable || ipv4.unavailable || ipv6.unavailable) unavailable = true;
+    if (domain.found || ipv4.found || ipv6.found) apiBoundaryNodeIds.push(nodeId);
   }
 
-  return {
+  if (unavailable) {
+    return result({
+      apiBoundaryNodeIds: [],
+      available: false,
+      warnings,
+    });
+  }
+
+  return result({
     apiBoundaryNodeIds,
     available: true,
     warnings,
-  };
+  });
 }

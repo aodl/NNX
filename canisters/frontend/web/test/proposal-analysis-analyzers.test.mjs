@@ -159,6 +159,110 @@ test('API boundary certified empty membership is treated as available', () => {
   assert.equal(codes(result).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_MEMBERSHIP_UNAVAILABLE), false);
 });
 
+test('API boundary add flags node that is already boundary when membership is available', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    apiBoundaryNodeIds: ['candidate'],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: {
+      candidate: {
+        id: 'candidate',
+        nodeId: 'candidate',
+        domain: 'candidate.example.com',
+        publicIpv4: { ipAddr: '203.0.113.10' },
+      },
+    },
+    intent: { actionKind: 'AddApiBoundaryNodes', addNodeIds: ['candidate'], allNodeIds: ['candidate'] },
+  }));
+
+  assert.ok(codes(result).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_ADD_NODE_ALREADY_API_BOUNDARY));
+});
+
+test('API boundary add non-boundary unassigned node with domain and IPv4 is clean', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: {
+      candidate: {
+        id: 'candidate',
+        nodeId: 'candidate',
+        domain: 'candidate.example.com',
+        publicIpv4: { ipAddr: '203.0.113.10' },
+      },
+    },
+    intent: { actionKind: 'AddApiBoundaryNodes', addNodeIds: ['candidate'], allNodeIds: ['candidate'] },
+  }));
+
+  assert.deepEqual(codes(result), []);
+});
+
+test('API boundary remove existing boundary node is clean before execution', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    apiBoundaryNodeIds: ['candidate'],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { candidate: { id: 'candidate', nodeId: 'candidate' } },
+    intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['candidate'], allNodeIds: ['candidate'] },
+  }));
+
+  assert.deepEqual(codes(result), []);
+});
+
+test('API boundary executed add/remove postconditions distinguish success from failure', () => {
+  assert.deepEqual(codes(apiBoundaryNodeAnalyzer.analyze(ctx({
+    lifecycle: 'post_execution_success',
+    apiBoundaryNodeIds: ['added'],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { added: { id: 'added', nodeId: 'added' } },
+    intent: { actionKind: 'AddApiBoundaryNodes', addNodeIds: ['added'], allNodeIds: ['added'] },
+  }))), []);
+
+  assert.ok(codes(apiBoundaryNodeAnalyzer.analyze(ctx({
+    lifecycle: 'post_execution_success',
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { added: { id: 'added', nodeId: 'added' } },
+    intent: { actionKind: 'AddApiBoundaryNodes', addNodeIds: ['added'], allNodeIds: ['added'] },
+  }))).includes(PROPOSAL_ISSUE_CODES.EXECUTED_ADD_API_BOUNDARY_NODE_NOT_BOUNDARY));
+
+  assert.deepEqual(codes(apiBoundaryNodeAnalyzer.analyze(ctx({
+    lifecycle: 'post_execution_success',
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { removed: { id: 'removed', nodeId: 'removed' } },
+    intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['removed'], allNodeIds: ['removed'] },
+  }))), []);
+
+  assert.ok(codes(apiBoundaryNodeAnalyzer.analyze(ctx({
+    lifecycle: 'post_execution_success',
+    apiBoundaryNodeIds: ['removed'],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { removed: { id: 'removed', nodeId: 'removed' } },
+    intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['removed'], allNodeIds: ['removed'] },
+  }))).includes(PROPOSAL_ISSUE_CODES.EXECUTED_REMOVE_API_BOUNDARY_NODE_STILL_BOUNDARY));
+});
+
+test('failed API boundary proposal does not produce postcondition warnings', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    lifecycle: 'rejected',
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { added: { id: 'added', nodeId: 'added' } },
+    intent: { actionKind: 'AddApiBoundaryNodes', addNodeIds: ['added'], allNodeIds: ['added'] },
+  }));
+
+  assert.deepEqual(codes(result), []);
+});
+
+test('API boundary unavailable membership means manual review', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: false,
+    nodesById: { candidate: { id: 'candidate', nodeId: 'candidate' } },
+    intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['candidate'], allNodeIds: ['candidate'] },
+  }));
+
+  assert.ok(codes(result).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_MEMBERSHIP_UNAVAILABLE));
+});
+
 test('DFINITY provider warning fires only when count drops to zero', () => {
   const result = dfinityProviderAnalyzer.analyze(ctx({
     nodesById: {

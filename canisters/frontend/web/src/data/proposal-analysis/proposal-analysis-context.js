@@ -164,7 +164,7 @@ export async function loadProposalAnalysisContext({
   ) {
     try {
       const membership = await queryFacade.getApiBoundaryNodeIds({ nodeIds: nodeIdsToLoad });
-      apiBoundaryNodeIds = membership?.apiBoundaryNodeIds ?? [];
+      apiBoundaryNodeIds = membership?.nodeIds ?? membership?.apiBoundaryNodeIds ?? [];
       apiBoundaryMembershipAvailable = Boolean(membership?.available);
       warnings.push(...(membership?.warnings ?? []));
     } catch {
