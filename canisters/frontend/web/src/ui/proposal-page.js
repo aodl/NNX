@@ -11,6 +11,7 @@ import { referencedSubnetsForProposal } from '../data/proposal-subnet-impacts.js
 import { groupNodeLocations } from '../data/subnet-loader.js';
 import { renderNotFoundPage } from './not-found-page.js';
 import { renderNodeGlobePanel } from './node-globe-panel.js';
+import { renderProposalAnalysisPanel } from './proposal-analysis-panel.js';
 import { renderSubnetSummaryPanel } from './subnet-summary-panel.js';
 import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 
@@ -330,6 +331,7 @@ function renderProposalDetails(
   }
 
   shell.append(back, header, visuals);
+  shell.append(renderProposalAnalysisPanel(proposal.analysis));
   if (subnetLoadError) {
     shell.append(renderSubnetLoadWarningPanel());
   } else if (referencedSubnets.length > 0) {

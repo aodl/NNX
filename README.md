@@ -4,6 +4,10 @@ Network Nexus is a first prototype of an NNS-governance-focused onchain dashboar
 
 The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, `/subnet/{subnet_id}` shows Registry-derived subnet details and node locations, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
 
+NNX proposal analysis uses only onchain/system-canister data available through the query facade: NNS Governance, NNS Registry, CMC, and normalized raw Registry reads. The analysis layer is lifecycle-aware, so pending proposals get precondition checks while successfully executed proposals get postcondition checks.
+
+Supported Phase 1 proposal action types are subnet membership changes, subnet creation, removing nodes from subnets, and API boundary node add/remove proposals. Manual external IP checks are reviewer aids only; NNX does not treat Globalping or other offchain tools as validation data. The DFINITY provider warning uses the fixed provider principal ID, not provider display names.
+
 ## Tooling
 
 This repository uses `icp-cli` and `icp.yaml`. It does not use `dfx` or `dfx.json`.

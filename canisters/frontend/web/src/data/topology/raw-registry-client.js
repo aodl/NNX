@@ -76,6 +76,14 @@ function readLengthDelimited(data, offset) {
   };
 }
 
+function readString(data, offset) {
+  const value = readLengthDelimited(data, offset);
+  return {
+    value: new TextDecoder().decode(value.value),
+    offset: value.offset,
+  };
+}
+
 function skipField(data, offset, wireType) {
   if (wireType === 0) return readVarint(data, offset).offset;
   if (wireType === 2) return readLengthDelimited(data, offset).offset;
@@ -187,13 +195,100 @@ export function decodeSubnetListRecord(data) {
 export function decodeNodeRecord(data) {
   const node = {
     nodeOperatorId: null,
+    publicIpv4: null,
+    domain: null,
+    httpEndpoint: null,
+    xnetEndpoint: null,
+    hostosVersionId: null,
+    rewardType: null,
   };
 
+  function decodeConnectionEndpoint(value) {
+    const endpoint = { ipAddr: null, port: null };
+    readFields(value, {
+      1: (fieldData, offset, wireType) => {
+        if (wireType !== 2) throw new Error('ConnectionEndpoint.ip_addr had invalid wire type.');
+        const result = readString(fieldData, offset);
+        endpoint.ipAddr = result.value || null;
+        return result.offset;
+      },
+      2: (fieldData, offset, wireType) => {
+        if (wireType !== 0) throw new Error('ConnectionEndpoint.port had invalid wire type.');
+        const result = readVarint(fieldData, offset);
+        endpoint.port = Number(result.value);
+        return result.offset;
+      },
+    });
+    if (!endpoint.ipAddr) return null;
+    return endpoint.port === null ? endpoint.ipAddr : `${endpoint.ipAddr}:${endpoint.port}`;
+  }
+
+  function decodePublicIpv4(value) {
+    const ipv4 = { ipAddr: null, gatewayIpAddr: [], prefixLength: null };
+    readFields(value, {
+      1: (fieldData, offset, wireType) => {
+        if (wireType !== 2) throw new Error('IPv4InterfaceConfig.ip_addr had invalid wire type.');
+        const result = readString(fieldData, offset);
+        ipv4.ipAddr = result.value || null;
+        return result.offset;
+      },
+      2: (fieldData, offset, wireType) => {
+        if (wireType !== 2) throw new Error('IPv4InterfaceConfig.gateway_ip_addr had invalid wire type.');
+        const result = readString(fieldData, offset);
+        if (result.value) ipv4.gatewayIpAddr.push(result.value);
+        return result.offset;
+      },
+      3: (fieldData, offset, wireType) => {
+        if (wireType !== 0) throw new Error('IPv4InterfaceConfig.prefix_length had invalid wire type.');
+        const result = readVarint(fieldData, offset);
+        ipv4.prefixLength = Number(result.value);
+        return result.offset;
+      },
+    });
+    return ipv4.ipAddr || ipv4.gatewayIpAddr.length || ipv4.prefixLength !== null ? ipv4 : null;
+  }
+
   readFields(bytes(data) ?? new Uint8Array(), {
+    5: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.xnet had invalid wire type.');
+      const value = readLengthDelimited(fieldData, offset);
+      node.xnetEndpoint = decodeConnectionEndpoint(value.value);
+      return value.offset;
+    },
+    6: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.http had invalid wire type.');
+      const value = readLengthDelimited(fieldData, offset);
+      node.httpEndpoint = decodeConnectionEndpoint(value.value);
+      return value.offset;
+    },
     15: (fieldData, offset, wireType) => {
       if (wireType !== 2) throw new Error('NodeRecord.node_operator_id had invalid wire type.');
       const value = readLengthDelimited(fieldData, offset);
       node.nodeOperatorId = Principal.fromUint8Array(value.value).toText();
+      return value.offset;
+    },
+    17: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.hostos_version_id had invalid wire type.');
+      const value = readString(fieldData, offset);
+      node.hostosVersionId = value.value || null;
+      return value.offset;
+    },
+    18: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.public_ipv4_config had invalid wire type.');
+      const value = readLengthDelimited(fieldData, offset);
+      node.publicIpv4 = decodePublicIpv4(value.value);
+      return value.offset;
+    },
+    19: (fieldData, offset, wireType) => {
+      if (wireType !== 2) throw new Error('NodeRecord.domain had invalid wire type.');
+      const value = readString(fieldData, offset);
+      node.domain = value.value || null;
+      return value.offset;
+    },
+    20: (fieldData, offset, wireType) => {
+      if (wireType !== 0) throw new Error('NodeRecord.node_reward_type had invalid wire type.');
+      const value = readVarint(fieldData, offset);
+      node.rewardType = `type:${value.value.toString()}`;
       return value.offset;
     },
   });

@@ -48,7 +48,15 @@ function subnetListFixture(subnetIds) {
 }
 
 function nodeRecordFixture(nodeOperatorId) {
-  return bytesField(15, Principal.fromText(nodeOperatorId).toUint8Array());
+  return concatBytes([
+    bytesField(15, Principal.fromText(nodeOperatorId).toUint8Array()),
+    bytesField(18, concatBytes([
+      bytesField(1, new TextEncoder().encode('203.0.113.10')),
+      bytesField(2, new TextEncoder().encode('203.0.113.1')),
+      varintField(3, 24),
+    ])),
+    bytesField(19, new TextEncoder().encode('node.example.com')),
+  ]);
 }
 
 function getValueResponseFixture(value) {
@@ -82,6 +90,16 @@ test('decodes raw Registry node record protobuf fixture', () => {
 
   assert.deepEqual(decodeNodeRecord(nodeRecordFixture(nodeOperatorId)), {
     nodeOperatorId,
+    publicIpv4: {
+      ipAddr: '203.0.113.10',
+      gatewayIpAddr: ['203.0.113.1'],
+      prefixLength: 24,
+    },
+    domain: 'node.example.com',
+    httpEndpoint: null,
+    xnetEndpoint: null,
+    hostosVersionId: null,
+    rewardType: null,
   });
 });
 
@@ -128,7 +146,20 @@ test('raw Registry client calls get_value and returns node record', async () => 
     },
   });
 
-  assert.deepEqual(await client.getNodeRecord(nodeId), { nodeId, nodeOperatorId });
+  assert.deepEqual(await client.getNodeRecord(nodeId), {
+    nodeId,
+    nodeOperatorId,
+    publicIpv4: {
+      ipAddr: '203.0.113.10',
+      gatewayIpAddr: ['203.0.113.1'],
+      prefixLength: 24,
+    },
+    domain: 'node.example.com',
+    httpEndpoint: null,
+    xnetEndpoint: null,
+    hostosVersionId: null,
+    rewardType: null,
+  });
   assert.equal(queryCall.canisterId, 'rwlgt-iiaaa-aaaaa-aaaaa-cai');
   assert.equal(queryCall.fields.methodName, 'get_value');
   assert.ok(new TextDecoder().decode(queryCall.fields.arg).includes(`node_record_${nodeId}`));

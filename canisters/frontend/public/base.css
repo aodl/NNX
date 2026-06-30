@@ -1106,6 +1106,148 @@ h2 {
   text-decoration: none;
 }
 
+.analysis-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.analysis-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+  line-height: 14px;
+}
+
+.analysis-chip.critical {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.analysis-chip.warning {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.analysis-chip.info {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.analysis-chip.manual-review {
+  border-color: #ddd6fe;
+  background: #f5f3ff;
+  color: #6d28d9;
+}
+
+.analysis-top-issues {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
+.analysis-top-issues span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proposal-analysis-panel {
+  display: grid;
+  gap: 12px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.analysis-issue-group,
+.analysis-state {
+  display: grid;
+  gap: 8px;
+}
+
+.analysis-issue-group h3,
+.analysis-state h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.analysis-issue-group ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.analysis-issue-group strong {
+  color: var(--text);
+}
+
+.analysis-metric-line,
+.analysis-node-list {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.35fr) minmax(0, 1fr);
+  gap: 10px;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.analysis-metric-line strong,
+.analysis-node-list strong {
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.analysis-node-details {
+  display: grid;
+  gap: 6px;
+}
+
+.analysis-node-details > div {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.4fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.analysis-node-details span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.analysis-node-details strong {
+  overflow-wrap: anywhere;
+}
+
+.analysis-node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.analysis-copy-button {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfd;
+  color: var(--text);
+  font-weight: 800;
+}
+
 .proposal-card:hover,
 .proposal-card:focus-visible {
   border-color: #b8c4d2;

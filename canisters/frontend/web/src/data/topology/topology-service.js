@@ -267,13 +267,21 @@ function buildNodeLocations(nodeIds, nodeRecords, topology, warnings = [], conte
       ));
     }
     return {
+      id: nodeId,
       nodeId,
+      currentSubnetId: context?.subnetId ?? null,
       nodeOperatorId,
       nodeProviderId: nodeOperator?.nodeProviderId ?? null,
       dataCenterId: dataCenter?.id ?? nodeOperator?.dataCenterId ?? null,
       dataCenterRegion: dataCenter?.region ?? null,
       dataCenterOwner: dataCenter?.owner ?? null,
       gps: dataCenter?.gps ?? null,
+      domain: nodeRecord?.domain ?? null,
+      publicIpv4: nodeRecord?.publicIpv4 ?? null,
+      httpEndpoint: nodeRecord?.httpEndpoint ?? null,
+      xnetEndpoint: nodeRecord?.xnetEndpoint ?? null,
+      hostosVersionId: nodeRecord?.hostosVersionId ?? null,
+      rewardType: nodeRecord?.rewardType ?? null,
     };
   });
 }

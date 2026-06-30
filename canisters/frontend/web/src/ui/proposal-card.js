@@ -1,6 +1,7 @@
 import {
   formatTimeRemaining,
 } from '../app/view-formatters.js';
+import { renderAnalysisBadges, renderTopIssueTitles } from './proposal-analysis-panel.js';
 import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 
 function icon(name) {
@@ -105,5 +106,8 @@ export function renderProposalCard(proposal) {
 
   heading.append(title, status);
   card.append(heading, metrics);
+  if (proposal.analysis) {
+    card.append(renderAnalysisBadges(proposal.analysis), renderTopIssueTitles(proposal.analysis));
+  }
   return card;
 }

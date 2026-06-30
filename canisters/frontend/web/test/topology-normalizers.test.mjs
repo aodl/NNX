@@ -410,13 +410,21 @@ test('getIcSubnetDetails joins subnet nodes to data center GPS', async () => {
 
   assert.equal(detail.subnet.id, subnetId);
   assert.deepEqual(detail.nodeLocations, [{
+    id: operatorPrincipal.toText(),
     nodeId: operatorPrincipal.toText(),
+    currentSubnetId: subnetId,
     nodeOperatorId: operatorPrincipal.toText(),
     nodeProviderId: providerId,
     dataCenterId: 'dc-1',
     dataCenterRegion: 'Europe',
     dataCenterOwner: 'Node Provider Ltd',
     gps: { latitude: 52.52, longitude: 13.405 },
+    domain: null,
+    publicIpv4: null,
+    httpEndpoint: null,
+    xnetEndpoint: null,
+    hostosVersionId: null,
+    rewardType: null,
   }]);
   assert.deepEqual(detail.warnings, []);
 });
@@ -440,13 +448,21 @@ test('getIcNodeDetails joins arbitrary Registry node records to data center GPS'
   const detail = await service.getIcNodeDetails({ nodeIds: [operatorPrincipal.toText()] });
 
   assert.deepEqual(detail.nodeLocations, [{
+    id: operatorPrincipal.toText(),
     nodeId: operatorPrincipal.toText(),
+    currentSubnetId: null,
     nodeOperatorId: operatorPrincipal.toText(),
     nodeProviderId: providerId,
     dataCenterId: 'dc-1',
     dataCenterRegion: 'Europe',
     dataCenterOwner: 'Node Provider Ltd',
     gps: { latitude: 52.52, longitude: 13.405 },
+    domain: null,
+    publicIpv4: null,
+    httpEndpoint: null,
+    xnetEndpoint: null,
+    hostosVersionId: null,
+    rewardType: null,
   }]);
   assert.deepEqual(detail.warnings, []);
 });

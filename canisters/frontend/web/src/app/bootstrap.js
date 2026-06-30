@@ -1,6 +1,7 @@
 import { parseRoute } from './router.js';
 import { createAgentQueryBackend } from '../data/query/agent-query-backend.js';
 import { createIcQueryFacade } from '../data/query/ic-query-facade.js';
+import { createProposalAnalysisService } from '../data/proposal-analysis/index.js';
 import { createNeuronLoader } from '../data/neuron-loader.js';
 import { createProposalLoader } from '../data/proposal-loader.js';
 import { createSubnetLoader } from '../data/subnet-loader.js';
@@ -29,23 +30,31 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
   }
 
   const queryFacade = await createQueryFacade(windowRef);
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  const analysisFacade = Object.freeze({
+    ...queryFacade,
+    analyzeProposal: analysisService.analyzeProposal,
+    analyzeProposalObject: analysisService.analyzeProposalObject,
+    analyzeOpenProposals: analysisService.analyzeOpenProposals,
+    analyzeSubnetProposals: analysisService.analyzeSubnetProposals,
+  });
 
   if (route.kind === 'home') {
-    const proposalLoader = createProposalLoader({ queryFacade });
+    const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
     await renderHomePage(root, { proposalLoader, subnetLoader });
     return;
   }
 
   if (route.kind === 'proposal') {
-    const proposalLoader = createProposalLoader({ queryFacade });
+    const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
     await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader, subnetLoader });
     return;
   }
 
   if (route.kind === 'subnet') {
-    const proposalLoader = createProposalLoader({ queryFacade });
+    const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
     await renderSubnetPage(root, { subnetId: route.subnetId, subnetLoader, proposalLoader });
     return;
