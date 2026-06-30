@@ -15,6 +15,7 @@ import {
   createNodeMetricsProxyActor,
   createNodeMetricsProxyClient,
 } from '../node-health-metrics/node-metrics-proxy-client.js';
+import { readApiBoundaryMembership } from '../topology/api-boundary-membership.js';
 import {
   normalizeCmcDefaultSubnetsResponse,
   normalizeCmcSubnetLabelsResponse,
@@ -255,6 +256,10 @@ export async function createAgentQueryBackend({
     };
   }
 
+  async function getApiBoundaryNodeIds({ nodeIds } = {}) {
+    return readApiBoundaryMembership({ agent, nodeIds });
+  }
+
   return Object.freeze({
     getNnsNeuron,
     getNnsNeurons,
@@ -268,6 +273,7 @@ export async function createAgentQueryBackend({
     getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,
     getNodeMetricsHistory: nodeMetricsProxyClient.getNodeMetricsHistory,
+    getApiBoundaryNodeIds,
     getCmcSubnetLabels,
     refreshIcTopology: topologyService.refreshIcTopology,
     clearTopologyCache: topologyService.clearTopologyCache,

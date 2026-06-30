@@ -76,6 +76,15 @@ function nonRemoveProposal(id = 12n) {
   };
 }
 
+function removeApiBoundaryProposal(id = 13n) {
+  return {
+    id,
+    statusKind: 'Open',
+    actionTypeName: 'RemoveApiBoundaryNodes',
+    actionValues: [{ name: 'node_ids', value: nodeA }],
+  };
+}
+
 function queryFacadeForModeTests({ proposals = [removeNodeProposal()], metricsResult = null } = {}) {
   let metricsCalls = 0;
   return {
@@ -142,4 +151,37 @@ test('failed metrics call produces manual-review issue without crashing', async 
   const analysis = await analysisService.analyzeProposalObject({ proposal: removeNodeProposal(), mode: 'full' });
   assert.equal(queryFacade.metricsCalls, 1);
   assert.equal(analysis.summary.manualReviewCount > 0, true);
+});
+
+test('API boundary proposal loads certified membership for referenced nodes', async () => {
+  let membershipCalls = 0;
+  const queryFacade = {
+    getOpenNnsProposals: async () => [],
+    getIcSubnets: async () => [{ id: subnetId, nodeIds: [] }],
+    getIcTopology: async () => ({}),
+    getCmcSubnetLabels: async () => ({}),
+    getIcNodeDetails: async ({ nodeIds }) => ({
+      nodeLocations: nodeIds.map((nodeId) => nodeLocation(nodeId, `provider-${nodeId}`, 40, -74)),
+      warnings: [],
+    }),
+    getApiBoundaryNodeIds: async ({ nodeIds }) => {
+      membershipCalls += 1;
+      assert.deepEqual(nodeIds, [nodeA]);
+      return { apiBoundaryNodeIds: [], available: true, warnings: [] };
+    },
+  };
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  const analysis = await analysisService.analyzeProposalObject({
+    proposal: removeApiBoundaryProposal(),
+    mode: 'full',
+  });
+  assert.equal(membershipCalls, 1);
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'API_BOUNDARY_REMOVE_NODE_NOT_API_BOUNDARY'),
+    true,
+  );
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === 'API_BOUNDARY_MEMBERSHIP_UNAVAILABLE'),
+    false,
+  );
 });

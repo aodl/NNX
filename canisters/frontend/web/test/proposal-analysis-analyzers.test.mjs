@@ -44,6 +44,8 @@ function ctx(overrides = {}) {
     analysisContext: {
       nodesById,
       apiBoundaryNodeIds: overrides.apiBoundaryNodeIds ?? [],
+      apiBoundaryMembershipAvailable: overrides.apiBoundaryMembershipAvailable
+        ?? Boolean(overrides.apiBoundaryNodeIds?.length),
       nodeHealthMetrics: overrides.nodeHealthMetrics ?? null,
       nodeHealthMetricsByNodeId: overrides.nodeHealthMetricsByNodeId ?? {},
       openProposals: [],
@@ -140,9 +142,21 @@ test('API boundary checks domain IPv4 assignment and postconditions', () => {
   assert.ok(codes(apiBoundaryNodeAnalyzer.analyze(ctx({
     lifecycle: 'post_execution_success',
     apiBoundaryNodeIds: ['stillBoundary'],
+    apiBoundaryMembershipAvailable: true,
     nodesById: { stillBoundary: { id: 'stillBoundary', nodeId: 'stillBoundary' } },
     intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['stillBoundary'], allNodeIds: ['stillBoundary'] },
   }))).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_EXECUTED_REMOVE_NODE_STILL_BOUNDARY));
+});
+
+test('API boundary certified empty membership is treated as available', () => {
+  const result = apiBoundaryNodeAnalyzer.analyze(ctx({
+    apiBoundaryNodeIds: [],
+    apiBoundaryMembershipAvailable: true,
+    nodesById: { candidate: { id: 'candidate', nodeId: 'candidate' } },
+    intent: { actionKind: 'RemoveApiBoundaryNodes', removeNodeIds: ['candidate'], allNodeIds: ['candidate'] },
+  }));
+  assert.ok(codes(result).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_REMOVE_NODE_NOT_API_BOUNDARY));
+  assert.equal(codes(result).includes(PROPOSAL_ISSUE_CODES.API_BOUNDARY_MEMBERSHIP_UNAVAILABLE), false);
 });
 
 test('DFINITY provider warning fires only when count drops to zero', () => {

@@ -37,7 +37,7 @@ export const apiBoundaryNodeAnalyzer = Object.freeze({
   analyze(context) {
     const issues = [];
     const common = base(context);
-    const boundaryIdsKnown = (context.analysisContext.apiBoundaryNodeIds ?? []).length > 0;
+    const boundaryIdsKnown = Boolean(context.analysisContext.apiBoundaryMembershipAvailable);
 
     if (context.lifecycle === 'pre_execution' && context.intent.actionKind === 'AddApiBoundaryNodes') {
       for (const nodeId of context.intent.addNodeIds) {

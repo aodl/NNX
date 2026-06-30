@@ -112,6 +112,8 @@ export async function loadProposalAnalysisContext({
   const nodeIdsToLoad = [...new Set([...(intent?.allNodeIds ?? []), ...targetNodeIds])];
   let nodeHealthMetrics = null;
   let nodeHealthMetricsByNodeId = {};
+  let apiBoundaryNodeIds = [];
+  let apiBoundaryMembershipAvailable = false;
 
   let nodeDetails = { nodeLocations: [], warnings: [] };
   if (nodeIdsToLoad.length > 0) {
@@ -155,6 +157,21 @@ export async function loadProposalAnalysisContext({
     );
   }
 
+  if (
+    (intent?.actionKind === 'AddApiBoundaryNodes' || intent?.actionKind === 'RemoveApiBoundaryNodes')
+    && nodeIdsToLoad.length > 0
+    && queryFacade?.getApiBoundaryNodeIds
+  ) {
+    try {
+      const membership = await queryFacade.getApiBoundaryNodeIds({ nodeIds: nodeIdsToLoad });
+      apiBoundaryNodeIds = membership?.apiBoundaryNodeIds ?? [];
+      apiBoundaryMembershipAvailable = Boolean(membership?.available);
+      warnings.push(...(membership?.warnings ?? []));
+    } catch {
+      warnings.push({ message: 'API boundary membership records are unavailable.' });
+    }
+  }
+
   return {
     proposal,
     openProposals: normalizedOpenProposals,
@@ -168,7 +185,8 @@ export async function loadProposalAnalysisContext({
     nodeOperatorsById: topology?.nodeOperatorsById ?? {},
     dataCentersById: topology?.dataCentersById ?? {},
     cmcLabels,
-    apiBoundaryNodeIds: [],
+    apiBoundaryNodeIds,
+    apiBoundaryMembershipAvailable,
     nodeHealthMetrics,
     nodeHealthMetricsByNodeId,
     warnings,
