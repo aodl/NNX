@@ -13,9 +13,14 @@ cargo build --workspace --target wasm32-unknown-unknown --release
 node tools/scripts/check-frontend-artifacts.mjs
 node tools/scripts/check-boundaries.mjs
 tools/scripts/security-scan
+npm run test:e2e
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_test.wasm ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
 ```
+
+`npm run test:e2e` uses Playwright Chromium and requires the browser system
+libraries documented by Playwright for the host OS. In minimal containers, run it
+in a browser-capable image or install the missing libraries first.
 
 The node metrics proxy valid-path smoke is manual because local replicas may not
 support the experimental management-canister method:

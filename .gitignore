@@ -16,6 +16,8 @@ target/
 # JavaScript
 node_modules/
 dist/
+playwright-report/
+test-results/
 
 # Environment variables
 .env

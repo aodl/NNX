@@ -12,6 +12,9 @@ import { renderProposalPage } from '../ui/proposal-page.js';
 import { renderSubnetPage } from '../ui/subnet-page.js';
 
 async function createQueryFacade(windowRef) {
+  if (windowRef.__NNX_TEST_QUERY_FACADE__) {
+    return windowRef.__NNX_TEST_QUERY_FACADE__;
+  }
   const hostname = windowRef.location.hostname;
   const local = hostname === 'localhost' || hostname === '127.0.0.1';
   const host = local ? windowRef.location.origin : 'https://icp0.io';
