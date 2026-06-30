@@ -5,6 +5,9 @@ const nodeA = '2vxsx-fae';
 const nodeB = 'uuc56-gyb';
 const proposalId = 9001n;
 const unsupportedProposalId = 9002n;
+const unsafeProposalId = 9003n;
+const apiBoundaryAvailableProposalId = 9004n;
+const apiBoundaryUnavailableProposalId = 9005n;
 const neuronId = 42n;
 
 async function installFixtureFacade(page) {
@@ -30,6 +33,7 @@ async function installFixtureFacade(page) {
         gps: { latitude: 40.7, longitude: -74 },
         domain: 'node-a.example.com',
         publicIpv4: { ipAddr: '203.0.113.10' },
+        publicIpv6: { ipAddr: '2001:db8::10' },
         httpEndpoint: 'https://node-a.example.com:8080',
         xnetEndpoint: '203.0.113.10:2497',
       },
@@ -43,6 +47,7 @@ async function installFixtureFacade(page) {
         gps: { latitude: 50.1, longitude: 8.6 },
         domain: 'node-b.example.com',
         publicIpv4: { ipAddr: '203.0.113.11' },
+        publicIpv6: { ipAddr: '2001:db8::11' },
         httpEndpoint: 'https://node-b.example.com:8080',
         xnetEndpoint: '203.0.113.11:2497',
       },
@@ -92,7 +97,35 @@ async function installFixtureFacade(page) {
       actionDescription: 'Unsupported action fixture.',
       actionValues: [],
     };
-    const proposals = [baseProposal, unsupportedProposal];
+    const unsafeProposal = {
+      ...baseProposal,
+      id: fixture.unsafeProposalId,
+      title: 'Unsafe URL fixture proposal',
+      url: 'javascript:alert(1)',
+    };
+    const apiBoundaryAvailableProposal = {
+      ...baseProposal,
+      id: fixture.apiBoundaryAvailableProposalId,
+      title: 'Remove non-boundary API node',
+      actionTypeName: 'RemoveApiBoundaryNodes',
+      actionDescription: 'Remove an API boundary node.',
+      actionValues: [{ name: 'node_ids', value: fixture.nodeA }],
+    };
+    const apiBoundaryUnavailableProposal = {
+      ...baseProposal,
+      id: fixture.apiBoundaryUnavailableProposalId,
+      title: 'Remove API node with unavailable membership',
+      actionTypeName: 'RemoveApiBoundaryNodes',
+      actionDescription: 'Remove an API boundary node.',
+      actionValues: [{ name: 'node_ids', value: fixture.nodeB }],
+    };
+    const proposals = [
+      baseProposal,
+      unsupportedProposal,
+      unsafeProposal,
+      apiBoundaryAvailableProposal,
+      apiBoundaryUnavailableProposal,
+    ];
 
     window.__NNX_TEST_QUERY_FACADE__ = {
       getOpenNnsProposals: async () => proposals,
@@ -165,13 +198,23 @@ async function installFixtureFacade(page) {
         partial: false,
         errors: [],
       }),
-      getApiBoundaryNodeIds: async () => ({
-        available: true,
-        nodeIds: [],
-        apiBoundaryNodeIds: [],
-        errors: [],
-        warnings: [],
-      }),
+      getApiBoundaryNodeIds: async ({ nodeIds }) => (
+        nodeIds.includes(fixture.nodeB)
+          ? {
+            available: false,
+            nodeIds: [],
+            apiBoundaryNodeIds: [],
+            errors: [],
+            warnings: [{ message: 'Fixture certified state unavailable.' }],
+          }
+          : {
+            available: true,
+            nodeIds: [],
+            apiBoundaryNodeIds: [],
+            errors: [],
+            warnings: [],
+          }
+      ),
       clearTopologyCache: () => {},
       refreshIcTopology: async () => ({}),
     };
@@ -181,6 +224,9 @@ async function installFixtureFacade(page) {
     nodeB,
     proposalId,
     unsupportedProposalId,
+    unsafeProposalId,
+    apiBoundaryAvailableProposalId,
+    apiBoundaryUnavailableProposalId,
     neuronId,
   });
 }
@@ -191,6 +237,17 @@ test.beforeEach(async ({ page }) => {
     if (message.type() === 'error') errors.push(message.text());
   });
   page.on('pageerror', (error) => errors.push(error.message));
+  await page.addInitScript(() => {
+    window.__NNX_COPIED_VALUES__ = [];
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async (value) => {
+          window.__NNX_COPIED_VALUES__.push(value);
+        },
+      },
+    });
+  });
   await installFixtureFacade(page);
   page.__nnxConsoleErrors = errors;
 });
@@ -212,15 +269,41 @@ test('core routes render with fixture data and no console errors', async ({ page
   await expect(page.getByRole('heading', { name: 'Proposal analysis' })).toBeVisible();
   await expect(page.getByText('Lifecycle mode: pre-execution')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'State change' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Informational findings' })).toBeVisible();
   const external = page.getByRole('link', { name: 'https://forum.dfinity.org/t/fixture-proposal' });
   await expect(external).toHaveAttribute('target', '_blank');
   await expect(external).toHaveAttribute('rel', 'noopener noreferrer');
+
+  await page.goto(`/proposal/${unsafeProposalId.toString()}`);
+  await expect(page.getByRole('heading', { name: 'Unsafe URL fixture proposal' })).toBeVisible();
+  await expect(page.locator('a[href^="javascript:"]')).toHaveCount(0);
+
+  await page.goto(`/proposal/${apiBoundaryAvailableProposalId.toString()}`);
+  await expect(page.getByText('Node is not known as API boundary')).toBeVisible();
+
+  await page.goto(`/proposal/${apiBoundaryUnavailableProposalId.toString()}`);
+  await expect(page.getByRole('heading', { name: 'Manual review' })).toBeVisible();
+  await expect(page.getByText('API boundary membership unavailable')).toBeVisible();
 
   await page.goto(`/subnet/${subnetId}`);
   await expect(page.getByRole('heading', { name: 'Application subnet' })).toBeVisible();
   await expect(page.getByText('Derived measurements for a 24-hour window; not canonical node status.')).toBeVisible();
   await expect(page.getByText('healthy_signal')).toBeVisible();
   await expect(page.getByText('insufficient_data')).toBeVisible();
+  await page.getByRole('button', { name: /2vxsx-fae/ }).click();
+  await expect(page.getByText('Copy node ID')).toBeVisible();
+  await page.getByRole('button', { name: 'Copy node ID' }).click();
+  await page.getByRole('button', { name: 'Copy IPv4' }).click();
+  await page.getByRole('button', { name: 'Copy domain' }).click();
+  await page.getByRole('button', { name: 'Copy HTTP endpoint' }).click();
+  await page.getByRole('button', { name: 'Copy XNet endpoint' }).click();
+  await expect.poll(() => page.evaluate(() => window.__NNX_COPIED_VALUES__)).toEqual([
+    '2vxsx-fae',
+    '203.0.113.10',
+    'node-a.example.com',
+    'https://node-a.example.com:8080',
+    '203.0.113.10:2497',
+  ]);
   await expect(page.getByText('Manual external check - Not used by NNX validation')).toBeVisible();
 
   await page.goto(`/neuron/${neuronId.toString()}`);

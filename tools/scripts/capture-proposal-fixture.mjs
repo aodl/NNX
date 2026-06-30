@@ -7,11 +7,12 @@ import { parseProposalIntent } from '../../canisters/frontend/web/src/data/propo
 
 const proposalId = process.argv[2] ? BigInt(process.argv[2]) : null;
 if (proposalId === null) {
-  console.error('usage: node tools/scripts/capture-proposal-fixture.mjs <proposal-id> [supported|unsupported]');
+  console.error('usage: node tools/scripts/capture-proposal-fixture.mjs <proposal-id> [supported|unsupported|historical]');
   process.exit(1);
 }
 
-const kind = process.argv[3] === 'unsupported' ? 'unsupported' : 'supported';
+const kindArg = process.argv[3] ?? 'supported';
+const kind = ['supported', 'unsupported', 'historical'].includes(kindArg) ? kindArg : 'supported';
 const backend = await createAgentQueryBackend({ host: 'https://icp-api.io', local: false });
 const proposal = await backend.getNnsProposal({ proposalId });
 if (!proposal) {
@@ -36,6 +37,7 @@ const fixture = {
   actionDescription: proposal.actionDescription,
   actionDetails: proposal.actionDetails,
   actionValues: proposal.actionValues,
+  ...(proposal.selfDescribingAction ? { selfDescribingAction: proposal.selfDescribingAction } : {}),
   payloadSummary: proposal.payloadSearchText,
   parsedIntent: {
     actionKind: intent.actionKind,

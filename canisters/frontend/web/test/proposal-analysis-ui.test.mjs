@@ -136,10 +136,13 @@ test('node detail copy buttons use textContent and Globalping link is external m
     dataCenterRegion: 'region',
     gps: { latitude: 1, longitude: 2 },
     publicIpv4: { ipAddr: '203.0.113.10' },
+    publicIpv6: { ipAddr: '2001:db8::10' },
     domain: 'node.example.com',
     httpEndpoint: '2001:db8::1:8080',
   });
   assert.match(panel.getTextContent(), /Copy IPv4/);
+  assert.match(panel.getTextContent(), /Copy IPv6/);
+  assert.match(panel.getTextContent(), /2001:db8::10/);
   assert.match(panel.getTextContent(), /Copy domain/);
   const link = panel.querySelector('a');
   assert.equal(link.target, '_blank');

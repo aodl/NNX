@@ -50,6 +50,7 @@ function renderNodeDetails(group, nodeId) {
     ['Registry GPS', group.gps ? `${group.gps.latitude}, ${group.gps.longitude}` : null],
     ['domain', node.domain],
     ['IPv4', node.publicIpv4?.ipAddr],
+    ['IPv6', node.publicIpv6?.ipAddr],
     ['HTTP endpoint', node.httpEndpoint],
     ['XNet endpoint', node.xnetEndpoint],
     ['metric signal', node.healthSignal],
@@ -70,6 +71,7 @@ function renderNodeDetails(group, nodeId) {
   for (const [label, value] of [
     ['Copy node ID', nodeId],
     ['Copy IPv4', node.publicIpv4?.ipAddr],
+    ['Copy IPv6', node.publicIpv6?.ipAddr],
     ['Copy domain', node.domain],
     ['Copy HTTP endpoint', node.httpEndpoint],
     ['Copy XNet endpoint', node.xnetEndpoint],

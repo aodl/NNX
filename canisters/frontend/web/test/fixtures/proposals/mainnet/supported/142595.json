@@ -1,0 +1,48 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.212Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142595",
+  "topicId": 7,
+  "topicLabel": "Subnet Management",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 1,
+  "rewardStatusKind": "accepting-votes",
+  "rewardStatusLabel": "Accepting votes",
+  "actionTypeName": "Change Subnet Membership",
+  "actionDescription": "Change the membership (list) of nodes in a subnet by adding and/or removing nodes from the subnet. At the time the proposal is executed, the added nodes (if provided in the proposal) need to be unassigned and the removed nodes (if provided in the proposal) need to be assigned to the subnet. After the proposal is executed, the removed nodes become unassigned, and can be reassigned to other subnets via future proposals or completely removed from the network.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "node_ids_remove",
+      "value": "7g3hi-3ypt3-4u3qa-6jmvf-eptxu-loh2i-poiih-fmgxl-7vlyd-g5hy3-nqe"
+    },
+    {
+      "name": "node_ids_add",
+      "value": "4e2ty-mcqal-loqca-j2d5b-qgou4-n6y6h-yojne-kvqlg-ld4jx-rjree-3qe"
+    },
+    {
+      "name": "subnet_id",
+      "value": "4ijpz-adles-eyy2p-2jrvq-ydefu-bvn6e-yfxuo-hmuf2-yi6gr-j3gss-bqe"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nChange the membership (list) of nodes in a subnet by adding and/or removing nodes from the subnet. At the time the proposal is executed, the added nodes (if provided in the proposal) need to be unassigned and the removed nodes (if provided in the proposal) need to be assigned to the subnet. After the proposal is executed, the removed nodes become unassigned, and can be reassigned to other subnets via future proposals or completely removed from the network.\ntype_name\nChange Subnet Membership\nvalue\nMap\nnode_ids_remove\nArray\nText\n7g3hi-3ypt3-4u3qa-6jmvf-eptxu-loh2i-poiih-fmgxl-7vlyd-g5hy3-nqe\nnode_ids_add\nArray\nText\n4e2ty-mcqal-loqca-j2d5b-qgou4-n6y6h-yojne-kvqlg-ld4jx-rjree-3qe\nsubnet_id\nText\n4ijpz-adles-eyy2p-2jrvq-ydefu-bvn6e-yfxuo-hmuf2-yi6gr-j3gss-bqe",
+  "parsedIntent": {
+    "actionKind": "ChangeSubnetMembership",
+    "confidence": "high",
+    "targetSubnetId": "4ijpz-adles-eyy2p-2jrvq-ydefu-bvn6e-yfxuo-hmuf2-yi6gr-j3gss-bqe",
+    "referencedSubnetIds": [
+      "4ijpz-adles-eyy2p-2jrvq-ydefu-bvn6e-yfxuo-hmuf2-yi6gr-j3gss-bqe"
+    ],
+    "addNodeIds": [
+      "4e2ty-mcqal-loqca-j2d5b-qgou4-n6y6h-yojne-kvqlg-ld4jx-rjree-3qe"
+    ],
+    "removeNodeIds": [
+      "7g3hi-3ypt3-4u3qa-6jmvf-eptxu-loh2i-poiih-fmgxl-7vlyd-g5hy3-nqe"
+    ],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

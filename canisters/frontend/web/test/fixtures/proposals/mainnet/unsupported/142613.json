@@ -1,0 +1,52 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.707Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142613",
+  "topicId": 8,
+  "topicLabel": "Application Canister Management",
+  "status": 1,
+  "statusKind": "open",
+  "statusLabel": "Open",
+  "rewardStatus": 1,
+  "rewardStatusKind": "accepting-votes",
+  "rewardStatusLabel": "Accepting votes",
+  "actionTypeName": "Install Code",
+  "actionDescription": "Install, reinstall or upgrade code of a canister controlled by the NNS.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "canister_id",
+      "value": "uqzsh-gqaaa-aaaaq-qaada-cai"
+    },
+    {
+      "name": "install_mode",
+      "value": "Upgrade"
+    },
+    {
+      "name": "skip_stopping_before_installing",
+      "value": "False"
+    },
+    {
+      "name": "arg_hash",
+      "value": "32 bytes"
+    },
+    {
+      "name": "wasm_module_hash",
+      "value": "32 bytes"
+    }
+  ],
+  "payloadSummary": "InstallCode\ntype_description\nInstall, reinstall or upgrade code of a canister controlled by the NNS.\ntype_name\nInstall Code\nvalue\nMap\ncanister_id\nText\nuqzsh-gqaaa-aaaaq-qaada-cai\ninstall_mode\nText\nUpgrade\nskip_stopping_before_installing\nBool\nfalse\narg_hash\nBlob\nwasm_module_hash\nBlob",
+  "parsedIntent": {
+    "actionKind": "Unsupported",
+    "confidence": "unsupported",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [],
+    "addNodeIds": [],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": false,
+    "parseWarnings": [
+      "Parsed principal references from free text fallback."
+    ]
+  }
+}

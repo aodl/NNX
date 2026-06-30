@@ -1,0 +1,164 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.403Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142071",
+  "topicId": 7,
+  "topicLabel": "Subnet Management",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 3,
+  "rewardStatusKind": "settled",
+  "rewardStatusLabel": "Settled",
+  "actionTypeName": "Create Subnet",
+  "actionDescription": "Combine a specified set of nodes, typically drawn from data centers and operators in such a way as to guarantee their independence, into a new decentralized subnet. The execution of this external update first initiates a new instance of the distributed key generation protocol. The transcript of that protocol is written to a new subnet record in the registry, together with initial configuration information for the subnet, from where the nodes comprising the subnet pick it up.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "subnet_admins",
+      "value": "lfyxc-k5ogp-4r5ho-dbtsk-lcpdz-ds46s-vzsvf-zn33q-253dp-4jxs5-lqe\nhsik4-2dfdr-tvogq-wqm4h-d76uj-wusg7-nk7hs-pn2q6-qs7lq-ed5p5-2ae\n7tdgc-b45dq-jnq7a-jlvm5-lj673-d5qw6-esw7y-5hyfn-zzzn2-hmdvm-sqe\njailj-64rfv-v3eih-f6xuf-f6yth-iuino-inp2x-5vlyg-nub2n-wno3n-mae"
+    },
+    {
+      "name": "max_ingress_bytes_per_message",
+      "value": "2097152"
+    },
+    {
+      "name": "max_block_payload_size",
+      "value": "4194304"
+    },
+    {
+      "name": "features",
+      "value": "sev_enabled: None\nhttp_requests: True\ncanister_sandboxing: False"
+    },
+    {
+      "name": "gossip_receive_check_cache_size",
+      "value": "0"
+    },
+    {
+      "name": "gossip_max_artifact_streams_per_peer",
+      "value": "0"
+    },
+    {
+      "name": "subnet_id_override",
+      "value": "None"
+    },
+    {
+      "name": "gossip_max_duplicity",
+      "value": "0"
+    },
+    {
+      "name": "gossip_pfn_evaluation_period_ms",
+      "value": "0"
+    },
+    {
+      "name": "gossip_registry_poll_period_ms",
+      "value": "0"
+    },
+    {
+      "name": "unit_delay_millis",
+      "value": "1000"
+    },
+    {
+      "name": "node_ids",
+      "value": "53amq-7hjxu-6lxaj-o2sp6-kmngy-qa22h-b7bo6-oeyyn-fkqnv-7tauf-7qe\ngkvz5-7x4my-44sht-fqb3i-brp2q-itjln-yre6b-ppbkv-b4iiw-xoobr-xae\non64t-fxozs-3bjno-ifzkh-gvhrv-nydln-w4iby-345ex-34mni-qrq5c-iae\niduk6-rcmen-bmn6i-npumh-v5swi-hq4f3-gzwdn-2p6d6-slwrn-i2smh-eae\nakufg-u5ttj-febtk-q6cln-kjlvq-yj6i7-uadcx-43tjv-izdss-3ybe6-bqe\ns3oi7-7lk5y-ohseg-wlcy5-qazqe-6cmld-kzoaq-m3yrj-qron2-qul6z-jae\n72xg3-cvfed-jrbv3-kal7e-o53wl-tug5y-t432v-5ovop-7et6y-abuzx-oae"
+    },
+    {
+      "name": "replica_version_id",
+      "value": "8115fd246af1286cda2934f7d707336cbbbda43f"
+    },
+    {
+      "name": "canister_cycles_cost_schedule",
+      "value": "Free"
+    },
+    {
+      "name": "initial_dkg_subnet_id",
+      "value": "fuqsr-in2lc-zbcjj-ydmcw-pzq7h-4xm2z-pto4i-dcyee-5z4rz-x63ji-nae"
+    },
+    {
+      "name": "dkg_dealings_per_block",
+      "value": "1"
+    },
+    {
+      "name": "is_halted",
+      "value": "False"
+    },
+    {
+      "name": "chain_key_config",
+      "value": "None"
+    },
+    {
+      "name": "start_as_nns",
+      "value": "False"
+    },
+    {
+      "name": "gossip_retransmission_request_ms",
+      "value": "0"
+    },
+    {
+      "name": "gossip_max_chunk_size",
+      "value": "0"
+    },
+    {
+      "name": "max_number_of_canisters",
+      "value": "0"
+    },
+    {
+      "name": "ingress_bytes_per_block_soft_cap",
+      "value": "0"
+    },
+    {
+      "name": "gossip_max_chunk_wait_ms",
+      "value": "0"
+    },
+    {
+      "name": "max_ingress_messages_per_block",
+      "value": "1000"
+    },
+    {
+      "name": "dkg_interval_length",
+      "value": "499"
+    },
+    {
+      "name": "initial_notary_delay_millis",
+      "value": "300"
+    },
+    {
+      "name": "max_ingress_bytes_per_block",
+      "value": "None"
+    },
+    {
+      "name": "resource_limits",
+      "value": "None"
+    },
+    {
+      "name": "subnet_type",
+      "value": "cloud_engine"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nCombine a specified set of nodes, typically drawn from data centers and operators in such a way as to guarantee their independence, into a new decentralized subnet. The execution of this external update first initiates a new instance of the distributed key generation protocol. The transcript of that protocol is written to a new subnet record in the registry, together with initial configuration information for the subnet, from where the nodes comprising the subnet pick it up.\ntype_name\nCreate Subnet\nvalue\nMap\nsubnet_admins\nArray\nText\nlfyxc-k5ogp-4r5ho-dbtsk-lcpdz-ds46s-vzsvf-zn33q-253dp-4jxs5-lqe\nText\nhsik4-2dfdr-tvogq-wqm4h-d76uj-wusg7-nk7hs-pn2q6-qs7lq-ed5p5-2ae\nText\n7tdgc-b45dq-jnq7a-jlvm5-lj673-d5qw6-esw7y-5hyfn-zzzn2-hmdvm-sqe\nText\njailj-64rfv-v3eih-f6xuf-f6yth-iuino-inp2x-5vlyg-nub2n-wno3n-mae\nmax_ingress_bytes_per_message\nNat\n2097152\nmax_block_payload_size\nNat\n4194304\nfeatures\nMap\nsev_enabled\nNull\nhttp_requests\nBool\ntrue\ncanister_sandboxing\nBool\nfalse\ngossip_receive_check_cache_size\nNat\n0\ngossip_max_artifact_streams_per_peer\nNat\n0\nsubnet_id_override\nNull\ngossip_max_duplicity\nNat\n0\ngossip_pfn_evaluation_period_ms\nNat\n0\ngossip_registry_poll_period_ms\nNat\n0\nunit_delay_millis\nNat\n1000\nssh_readonly_access\nArray\nnode_ids\nArray\nText\n53amq-7hjxu-6lxaj-o2sp6-kmngy-qa22h-b7bo6-oeyyn-fkqnv-7tauf-7qe\nText\ngkvz5-7x4my-44sht-fqb3i-brp2q-itjln-yre6b-ppbkv-b4iiw-xoobr-xae\nText\non64t-fxozs-3bjno-ifzkh-gvhrv-nydln-w4iby-345ex-34mni-qrq5c-iae\nText\niduk6-rcmen-bmn6i-npumh-v5swi-hq4f3-gzwdn-2p6d6-slwrn-i2smh-eae\nText\nakufg-u5ttj-febtk-q6cln-kjlvq-yj6i7-uadcx-43tjv-izdss-3ybe6-bqe\nText\ns3oi7-7lk5y-ohseg-wlcy5-qazqe-6cmld-kzoaq-m3yrj-qron2-qul6z-jae\nText\n72xg3-cvfed-jrbv3-kal7e-o53wl-tug5y-t432v-5ovop-7et6y-abuzx-oae\nreplica_version_id\nText\n8115fd246af1286cda2934f7d707336cbbbda43f\ncanister_cycles_cost_schedule\nText\nFree\ninitial_dkg_subnet_id\nText\nfuqsr-in2lc-zbcjj-ydmcw-pzq7h-4xm2z-pto4i-dcyee-5z4rz-x63ji-nae\ndkg_dealings_per_block\nNat\n1\nis_halted\nBool\nfalse\nchain_key_config\nNull\nstart_as_nns\nBool\nfalse\ngossip_retransmission_request_ms\nNat\n0\ngossip_max_chunk_size\nNat\n0\nmax_number_of_canisters\nNat\n0\ningress_bytes_per_block_soft_cap\nNat\n0\ngossip_max_chunk_wait_ms\nNat\n0\nssh_backup_access\nArray\nmax_ingress_messages_per_block\nNat\n1000\ndkg_interval_length\nNat\n499\ninitial_notary_delay_millis\nNat\n300\nmax_ingress_bytes_per_block\nNull\nresource_limits\nNull\nsubnet_type\nText\ncloud_engine",
+  "parsedIntent": {
+    "actionKind": "CreateSubnet",
+    "confidence": "high",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [
+      "lfyxc-k5ogp-4r5ho-dbtsk-lcpdz-ds46s-vzsvf-zn33q-253dp-4jxs5-lqe",
+      "hsik4-2dfdr-tvogq-wqm4h-d76uj-wusg7-nk7hs-pn2q6-qs7lq-ed5p5-2ae",
+      "7tdgc-b45dq-jnq7a-jlvm5-lj673-d5qw6-esw7y-5hyfn-zzzn2-hmdvm-sqe",
+      "jailj-64rfv-v3eih-f6xuf-f6yth-iuino-inp2x-5vlyg-nub2n-wno3n-mae",
+      "fuqsr-in2lc-zbcjj-ydmcw-pzq7h-4xm2z-pto4i-dcyee-5z4rz-x63ji-nae"
+    ],
+    "addNodeIds": [
+      "53amq-7hjxu-6lxaj-o2sp6-kmngy-qa22h-b7bo6-oeyyn-fkqnv-7tauf-7qe",
+      "gkvz5-7x4my-44sht-fqb3i-brp2q-itjln-yre6b-ppbkv-b4iiw-xoobr-xae",
+      "on64t-fxozs-3bjno-ifzkh-gvhrv-nydln-w4iby-345ex-34mni-qrq5c-iae",
+      "iduk6-rcmen-bmn6i-npumh-v5swi-hq4f3-gzwdn-2p6d6-slwrn-i2smh-eae",
+      "akufg-u5ttj-febtk-q6cln-kjlvq-yj6i7-uadcx-43tjv-izdss-3ybe6-bqe",
+      "s3oi7-7lk5y-ohseg-wlcy5-qazqe-6cmld-kzoaq-m3yrj-qron2-qul6z-jae",
+      "72xg3-cvfed-jrbv3-kal7e-o53wl-tug5y-t432v-5ovop-7et6y-abuzx-oae"
+    ],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": true,
+    "parseWarnings": []
+  }
+}

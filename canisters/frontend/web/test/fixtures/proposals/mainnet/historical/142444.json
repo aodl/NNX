@@ -1,0 +1,50 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.826Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142444",
+  "topicId": 13,
+  "topicLabel": "IC OS Version Election",
+  "status": 5,
+  "statusKind": "failed",
+  "statusLabel": "Failed",
+  "rewardStatus": 3,
+  "rewardStatusKind": "settled",
+  "rewardStatusLabel": "Settled",
+  "actionTypeName": "Revise Elected GuestOS Versions",
+  "actionDescription": "Change the set of elected GuestOS versions.\n\nThe version to elect (identified by the hash of the installation image) is added to the registry. Besides creating a record for that version, the proposal also appends that version to the list of elected versions that can be installed on nodes of a subnet.\n\nOnly elected GuestOS versions can be deployed.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "replica_versions_to_unelect",
+      "value": "\"b090f12a838fc5118002d5e832f459cb4c46c399\",\n\"77f5bce6c37ee4e149cf7c41fdaef38059a7a058\",\n\"fb721da900b9e9219773ee312f987971338f7c62\"\n\"93274f1726d9575389004069c4a46a32084051f5\",\n\"6c2b4d16024482f6e9ff794652ab506e603aacc9\",\n\"a47e5434753752c1d2972fbc4407d14f88964285\",\n\"b95f4a32b41798de115aac9298b51dd1662f1da5\",\n[\n]\n\"557d7278dcbb0305411c6536645c3a32b4ec64b6\","
+    },
+    {
+      "name": "guest_launch_measurements",
+      "value": "guest_launch_measurements:     measurement: 48 bytes\n    metadata:       kernel_cmdline: root=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n      vcpu_type: EPYC-v4,     measurement: 48 bytes\n    metadata:       kernel_cmdline: root=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n      vcpu_type: EPYC-v4,     metadata:       kernel_cmdline: root=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n      vcpu_type: EPYC-Genoa\n    measurement: 48 bytes,     measurement: 48 bytes\n    metadata:       kernel_cmdline: root=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n      vcpu_type: EPYC-Genoa,     metadata:       vcpu_type: EPYC-Turin\n      kernel_cmdline: root=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n    measurement: 48 bytes,     measurement: 48 bytes\n    metadata:       kernel_cmdline: root=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\n      vcpu_type: EPYC-Turin"
+    },
+    {
+      "name": "release_package_urls",
+      "value": "https://download.dfinity.systems/ic/63e7f8649be744b7ea75bd5571189a2c04ac49bd/guest-os/update-img/update-img.tar.zst\nhttps://download.dfinity.network/ic/63e7f8649be744b7ea75bd5571189a2c04ac49bd/guest-os/update-img/update-img.tar.zst"
+    },
+    {
+      "name": "release_package_sha256_hex",
+      "value": "ebbbec3b5f8598549b14dbd2850ab7f0b27dab9e21775bfa26817f501bce6c01"
+    },
+    {
+      "name": "replica_version_to_elect",
+      "value": "63e7f8649be744b7ea75bd5571189a2c04ac49bd"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nChange the set of elected GuestOS versions.\n\nThe version to elect (identified by the hash of the installation image) is added to the registry. Besides creating a record for that version, the proposal also appends that version to the list of elected versions that can be installed on nodes of a subnet.\n\nOnly elected GuestOS versions can be deployed.\ntype_name\nRevise Elected GuestOS Versions\nvalue\nMap\nreplica_versions_to_unelect\nArray\nText\n\"b090f12a838fc5118002d5e832f459cb4c46c399\",\nText\n\"77f5bce6c37ee4e149cf7c41fdaef38059a7a058\",\nText\n\"fb721da900b9e9219773ee312f987971338f7c62\"\nText\n\"93274f1726d9575389004069c4a46a32084051f5\",\nText\n\"6c2b4d16024482f6e9ff794652ab506e603aacc9\",\nText\n\"a47e5434753752c1d2972fbc4407d14f88964285\",\nText\n\"b95f4a32b41798de115aac9298b51dd1662f1da5\",\nText\n[\nText\n]\nText\n\"557d7278dcbb0305411c6536645c3a32b4ec64b6\",\nguest_launch_measurements\nMap\nguest_launch_measurements\nArray\nMap\nmeasurement\nBlob\nmetadata\nMap\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nvcpu_type\nText\nEPYC-v4\nMap\nmeasurement\nBlob\nmetadata\nMap\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nvcpu_type\nText\nEPYC-v4\nMap\nmetadata\nMap\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nvcpu_type\nText\nEPYC-Genoa\nmeasurement\nBlob\nMap\nmeasurement\nBlob\nmetadata\nMap\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nvcpu_type\nText\nEPYC-Genoa\nMap\nmetadata\nMap\nvcpu_type\nText\nEPYC-Turin\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/7c0a626e-e5ea-e543-b5c5-300eb8304db7 console=ttyS0 nomodeset dfinity.system=A dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nmeasurement\nBlob\nMap\nmeasurement\nBlob\nmetadata\nMap\nkernel_cmdline\nText\nroot=/dev/disk/by-partuuid/a78bc3a8-376c-054a-96e7-3904b915d0c5 console=ttyS0 nomodeset dfinity.system=B dfinity.tee=1 security=selinux selinux=1 enforcing=1 root_hash=7df611179ca4d055d08d13a40381597a904b7f31ce4e7ead5e59084e0251290c\nvcpu_type\nText\nEPYC-Turin\nrelease_package_urls\nArray\nText\nhttps://download.dfinity.systems/ic/63e7f8649be744b7ea75bd5571189a2c04ac49bd/guest-os/update-img/update-img.tar.zst\nText\nhttps://download.dfinity.network/ic/63e7f8649be744b7ea75bd5571189a2c04ac49bd/guest-os/update-img/update-img.tar.zst\nrelease_package_sha256_hex\nText\nebbbec3b5f8598549b14dbd2850ab7f0b27dab9e21775bfa26817f501bce6c01\nreplica_version_to_elect\nText\n63e7f8649be744b7ea75bd5571189a2c04ac49bd",
+  "parsedIntent": {
+    "actionKind": "Unsupported",
+    "confidence": "unsupported",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [],
+    "addNodeIds": [],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

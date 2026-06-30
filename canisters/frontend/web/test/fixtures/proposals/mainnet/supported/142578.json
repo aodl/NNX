@@ -1,0 +1,40 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.766Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142578",
+  "topicId": 15,
+  "topicLabel": "API Boundary Node Management",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 3,
+  "rewardStatusKind": "settled",
+  "rewardStatusLabel": "Settled",
+  "actionTypeName": "Add API Boundary Nodes",
+  "actionDescription": "Add a set of new API Boundary Nodes using unassigned nodes.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "node_ids",
+      "value": "nzkwt-lgmdg-k3yav-efgz3-2fehw-36t4z-moaz2-ou2bl-ysnrp-rdhlm-5ae"
+    },
+    {
+      "name": "version",
+      "value": "687ec6eeda1650b60d5de4077891baa277e7021e"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nAdd a set of new API Boundary Nodes using unassigned nodes.\ntype_name\nAdd API Boundary Nodes\nvalue\nMap\nnode_ids\nArray\nText\nnzkwt-lgmdg-k3yav-efgz3-2fehw-36t4z-moaz2-ou2bl-ysnrp-rdhlm-5ae\nversion\nText\n687ec6eeda1650b60d5de4077891baa277e7021e",
+  "parsedIntent": {
+    "actionKind": "AddApiBoundaryNodes",
+    "confidence": "high",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [],
+    "addNodeIds": [
+      "nzkwt-lgmdg-k3yav-efgz3-2fehw-36t4z-moaz2-ou2bl-ysnrp-rdhlm-5ae"
+    ],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": true,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

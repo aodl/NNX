@@ -20,7 +20,9 @@ ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-b
 
 `npm run test:e2e` uses Playwright Chromium and requires the browser system
 libraries documented by Playwright for the host OS. In minimal containers, run it
-in a browser-capable image or install the missing libraries first.
+in a browser-capable image or install the missing libraries first. See
+`docs/testing/browser-smoke.md` for the fixture harness and test-only query
+facade notes.
 
 The node metrics proxy valid-path smoke is manual because local replicas may not
 support the experimental management-canister method:

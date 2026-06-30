@@ -12,6 +12,9 @@ import { renderProposalPage } from '../ui/proposal-page.js';
 import { renderSubnetPage } from '../ui/subnet-page.js';
 
 async function createQueryFacade(windowRef) {
+  // Test harness only: Playwright injects a normalized query facade before app
+  // bootstrap so browser tests can run without mainnet or local replica access.
+  // Production pages do not define this property and use the IC query backend.
   if (windowRef.__NNX_TEST_QUERY_FACADE__) {
     return windowRef.__NNX_TEST_QUERY_FACADE__;
   }

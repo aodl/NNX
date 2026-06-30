@@ -1,0 +1,36 @@
+{
+  "capturedAt": "2026-06-30T21:49:23.632Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142577",
+  "topicId": 15,
+  "topicLabel": "API Boundary Node Management",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 3,
+  "rewardStatusKind": "settled",
+  "rewardStatusLabel": "Settled",
+  "actionTypeName": "Remove API Boundary Nodes",
+  "actionDescription": "Remove a set of API Boundary Nodes, which will designate them as unassigned nodes.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "node_ids",
+      "value": "dl74z-6vpps-k6bpu-5hjsj-fb6lb-34tsv-ue5gt-bdkjn-35pt5-fdu2a-rae"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nRemove a set of API Boundary Nodes, which will designate them as unassigned nodes.\ntype_name\nRemove API Boundary Nodes\nvalue\nMap\nnode_ids\nArray\nText\ndl74z-6vpps-k6bpu-5hjsj-fb6lb-34tsv-ue5gt-bdkjn-35pt5-fdu2a-rae",
+  "parsedIntent": {
+    "actionKind": "RemoveApiBoundaryNodes",
+    "confidence": "high",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [],
+    "addNodeIds": [],
+    "removeNodeIds": [
+      "dl74z-6vpps-k6bpu-5hjsj-fb6lb-34tsv-ue5gt-bdkjn-35pt5-fdu2a-rae"
+    ],
+    "isApiBoundaryAction": true,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

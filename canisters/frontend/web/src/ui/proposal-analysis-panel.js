@@ -200,6 +200,7 @@ export function renderAnalysisNodeDetails(node) {
     ['region', node.dataCenterRegion],
     ['GPS', node.gps ? `${node.gps.latitude}, ${node.gps.longitude}` : null],
     ['IPv4', node.publicIpv4?.ipAddr],
+    ['IPv6', node.publicIpv6?.ipAddr],
     ['domain', node.domain],
     ['HTTP/XNet endpoints', [node.httpEndpoint, node.xnetEndpoint].filter(Boolean).join(' / ') || null],
   ];
@@ -215,8 +216,9 @@ export function renderAnalysisNodeDetails(node) {
   const actions = document.createElement('div');
   actions.className = 'analysis-node-actions';
   if (node.publicIpv4?.ipAddr) actions.append(copyButton('Copy IPv4', node.publicIpv4.ipAddr));
+  if (node.publicIpv6?.ipAddr) actions.append(copyButton('Copy IPv6', node.publicIpv6.ipAddr));
   const endpoint = node.httpEndpoint ?? node.xnetEndpoint;
-  if (endpoint) actions.append(copyButton('Copy IPv6 / endpoint IP', endpoint));
+  if (endpoint) actions.append(copyButton('Copy endpoint', endpoint));
   if (node.domain) actions.append(copyButton('Copy domain', node.domain));
   const link = document.createElement('a');
   link.href = 'https://www.globalping.io/';
