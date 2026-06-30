@@ -2,15 +2,21 @@ import {
   applyNodeProposalIntents,
   referencedNodeCandidatesForProposal,
 } from './proposal-node-impacts.js';
+import { createRequestCache } from './request-cache.js';
 
 export function createProposalLoader({ queryFacade }) {
   const analysisService = queryFacade?.analyzeOpenProposals ? queryFacade : null;
+  const cache = createRequestCache({
+    debug: globalThis.localStorage?.getItem?.('nnxDebug') === '1',
+  });
 
   async function loadOpenProposals() {
-    const proposals = await queryFacade.getOpenNnsProposals();
+    const proposals = await cache.get('open-proposals', () => queryFacade.getOpenNnsProposals());
     let analysesById = new Map();
     if (analysisService) {
-      const analyses = await analysisService.analyzeOpenProposals().catch(() => []);
+      const analyses = await cache.get('open-proposal-analyses', () => (
+        analysisService.analyzeOpenProposals({ mode: 'summary' }).catch(() => [])
+      ));
       analysesById = new Map(analyses.map((analysis) => [analysis.proposalId?.toString(), analysis]));
     }
     return proposals.map((proposal) => ({
@@ -25,9 +31,11 @@ export function createProposalLoader({ queryFacade }) {
   }
 
   async function loadProposal(proposalId) {
-    const proposal = await queryFacade.getNnsProposal({ proposalId });
+    const proposal = await cache.get(`proposal:${proposalId}`, () => queryFacade.getNnsProposal({ proposalId }));
     if (!proposal || !analysisService) return proposal;
-    const analysis = await analysisService.analyzeProposalObject({ proposal }).catch(() => null);
+    const analysis = await cache.get(`proposal-analysis:${proposalId}`, () => (
+      analysisService.analyzeProposalObject({ proposal, mode: 'full' }).catch(() => null)
+    ));
     return { ...proposal, analysis };
   }
 

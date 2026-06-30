@@ -239,3 +239,75 @@ test('subnet loader uses special labels only when CMC has no label', async () =>
   assert.equal(result.subnets[0].cmcLabel, 'NNS');
   assert.equal(result.subnets[1].cmcLabel, 'CMC SNS');
 });
+
+function subnetMetricsQueryFacade({ metricsResponse, metricsThrows = false } = {}) {
+  let metricsCalls = 0;
+  return {
+    get metricsCalls() {
+      return metricsCalls;
+    },
+    getIcSubnetDetails: async ({ subnetId }) => ({
+      subnet: { id: subnetId, nodeCount: 2, type: 'application', nodeIds: ['node-1', 'node-2'] },
+      nodeLocations: [{ nodeId: 'node-1' }, { nodeId: 'node-2' }],
+      warnings: [],
+    }),
+    getCmcSubnetLabels: async () => ({
+      labelsBySubnetId: {},
+      defaultSubnetIds: [],
+      publicSubnetIds: [],
+      warnings: [],
+    }),
+    getNodeMetricsHistory: async () => {
+      metricsCalls += 1;
+      if (metricsThrows) throw new Error('metrics unavailable');
+      return metricsResponse ?? {
+        subnetId: 'subnet-1',
+        startAtTimestampNanos: 1n,
+        endAtTimestampNanos: 2n,
+        records: [
+          {
+            nodeId: 'node-1',
+            timestampNanos: 1n,
+            numBlocksProposedTotal: 1n,
+            numBlockFailuresTotal: 0n,
+          },
+          {
+            nodeId: 'node-1',
+            timestampNanos: 2n,
+            numBlocksProposedTotal: 5n,
+            numBlockFailuresTotal: 0n,
+          },
+        ],
+        partial: false,
+        errors: [],
+      };
+    },
+  };
+}
+
+test('subnet page loader calls metrics once per subnet load', async () => {
+  const queryFacade = subnetMetricsQueryFacade();
+  const loader = createSubnetLoader({ queryFacade });
+  const result = await loader.loadSubnetDetails('subnet-1');
+  assert.equal(queryFacade.metricsCalls, 1);
+  assert.equal(result.nodeHealthMetrics.metrics.length, 2);
+});
+
+test('failed subnet metrics call produces partial state without crashing', async () => {
+  const queryFacade = subnetMetricsQueryFacade({ metricsThrows: true });
+  const loader = createSubnetLoader({ queryFacade });
+  const result = await loader.loadSubnetDetails('subnet-1');
+  assert.equal(queryFacade.metricsCalls, 1);
+  assert.equal(result.nodeHealthMetrics.partial, true);
+  assert.equal(result.nodeHealthMetrics.errors[0].code, 'NODE_METRICS_UNAVAILABLE');
+});
+
+test('subnet metrics request cache deduplicates repeated metrics calls', async () => {
+  const queryFacade = subnetMetricsQueryFacade();
+  const loader = createSubnetLoader({ queryFacade });
+  await Promise.all([
+    loader.loadSubnetDetails('subnet-1'),
+    loader.loadSubnetDetails('subnet-1'),
+  ]);
+  assert.equal(queryFacade.metricsCalls, 1);
+});

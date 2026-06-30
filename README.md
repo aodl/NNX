@@ -160,4 +160,29 @@ Private hotkeys and followees show `Private`.
 
 Non-existent valid-shaped neuron IDs are detected client-side after the NNS query.
 
-The guarantee proof is structural, conservative, and bounded by max transitive depth. Every effective followee must resolve to alpha-vote, omega-vote, or omega-reject, except that omega-reject with at most one other effective followee is treated as guaranteed because a reject breaks a tie. Other majority logic and voting power are intentionally ignored.
+The guarantee proof is structural, conservative, threshold-based, and bounded by
+max transitive depth. Alpha-vote and omega-vote are treated as guaranteed Yes
+anchors. Omega-reject is treated as a guaranteed No anchor. Unknown, private,
+cyclic, or depth-limited branches do not block a guarantee when already-known
+branches satisfy the relevant Yes/No threshold.
+
+Additional checks:
+
+```sh
+npm ci --no-fund --no-audit
+npm run test:frontend-unit
+cargo fmt --all -- --check
+cargo test --workspace
+npm run build:frontend
+node tools/scripts/check-frontend-artifacts.mjs
+node tools/scripts/check-boundaries.mjs
+```
+
+Security scans:
+
+```sh
+tools/scripts/security-scan
+```
+
+See `docs/release-checklist.md`, `docs/security/frontend-security.md`, and
+`docs/architecture/query-boundaries.md`.

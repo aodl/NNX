@@ -1,13 +1,9 @@
-import { Principal } from '@icp-sdk/core/principal';
+import { normalizePrincipalText } from '../data/query/principal-text.js';
 
 const MAX_NAT64 = (1n << 64n) - 1n;
 
 function isPrincipalText(value) {
-  try {
-    return Principal.fromText(value).toText() === value;
-  } catch {
-    return false;
-  }
+  return normalizePrincipalText(value) === value;
 }
 
 export function parseRoute(pathname) {

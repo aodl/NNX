@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+missing=()
+run_or_note() {
+  local tool="$1"
+  shift
+  if command -v "$tool" >/dev/null 2>&1; then
+    "$tool" "$@"
+  else
+    missing+=("$tool")
+  fi
+}
+
+node tools/scripts/check-npm-lock-hermetic.mjs
+npm audit --audit-level=high
+run_or_note cargo audit
+run_or_note cargo deny check
+run_or_note osv-scanner --config osv-scanner.toml .
+
+if ((${#missing[@]} > 0)); then
+  if [[ "${NNX_SKIP_SECURITY_TOOLS:-}" == "1" ]]; then
+    printf 'Skipping unavailable security tools because NNX_SKIP_SECURITY_TOOLS=1: %s\n' "${missing[*]}"
+  else
+    printf 'Missing required security tools: %s\n' "${missing[*]}" >&2
+    printf 'Install them or set NNX_SKIP_SECURITY_TOOLS=1 for local-only skips.\n' >&2
+    exit 1
+  fi
+fi

@@ -1,4 +1,9 @@
 import { affectedProposalsForSubnet } from '../data/proposal-subnet-impacts.js';
+import {
+  applyNodeProposalIntents,
+  referencedNodeCandidatesForProposal,
+} from '../data/proposal-node-impacts.js';
+import { groupNodeLocations } from '../data/subnet-loader.js';
 import { renderNotFoundPage } from './not-found-page.js';
 import { renderNodeGlobePanel } from './node-globe-panel.js';
 import { renderProposalPanel } from './proposal-list-panel.js';
@@ -49,6 +54,30 @@ function renderWarnings(warnings) {
   return details;
 }
 
+function renderNodeHealthSummary(nodeHealthMetrics) {
+  if (!nodeHealthMetrics) return null;
+  const section = document.createElement('section');
+  section.className = 'subnet-node-health-summary';
+  const title = document.createElement('h2');
+  title.textContent = 'Node metric signals';
+  const note = document.createElement('p');
+  note.className = 'muted';
+  note.textContent = `Derived measurements for a ${nodeHealthMetrics.windowHours}-hour window; not canonical node status.`;
+  const list = document.createElement('dl');
+  list.className = 'subnet-metrics';
+  for (const [signal, count] of Object.entries(nodeHealthMetrics.summary ?? {})) {
+    list.append(metric(signal, String(count)));
+  }
+  section.append(title, note, list);
+  if (nodeHealthMetrics.errors?.length) {
+    const error = document.createElement('p');
+    error.className = 'muted';
+    error.textContent = nodeHealthMetrics.errors.map((item) => item.message).join(' ');
+    section.append(error);
+  }
+  return section;
+}
+
 function renderProposalLoadErrorPanel() {
   const panel = document.createElement('section');
   panel.className = 'proposal-panel subnet-proposal-panel';
@@ -71,6 +100,7 @@ function renderSubnetDetails({
   warnings,
   affectedProposals = [],
   proposalLoadError = null,
+  nodeHealthMetrics = null,
 }) {
   const shell = document.createElement('main');
   shell.className = 'subnet-detail-page';
@@ -105,6 +135,8 @@ function renderSubnetDetails({
   );
 
   shell.append(back, header, metrics, renderMap(locationGroups));
+  const healthSummary = renderNodeHealthSummary(nodeHealthMetrics);
+  if (healthSummary) shell.append(healthSummary);
   shell.append(proposalLoadError
     ? renderProposalLoadErrorPanel()
     : renderProposalPanel({
@@ -113,6 +145,7 @@ function renderSubnetDetails({
       emptyText: 'There are currently no accepting-votes proposals that reference this subnet.',
       statusText: 'Accepting votes',
       grouped: false,
+      severityFilters: true,
       className: 'proposal-panel subnet-proposal-panel',
     }));
   const warningSection = renderWarnings(warnings);
@@ -161,6 +194,12 @@ export async function renderSubnetPage(root, { subnetId, subnetLoader, proposalL
     } catch (error) {
       proposalLoadError = error;
     }
+  }
+
+  if (affectedProposals.length > 0) {
+    const candidates = affectedProposals.flatMap((proposal) => referencedNodeCandidatesForProposal(proposal));
+    detail.nodeLocations = applyNodeProposalIntents(detail.nodeLocations, candidates);
+    detail.locationGroups = groupNodeLocations(detail.nodeLocations);
   }
 
   clear(root);

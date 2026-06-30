@@ -6,6 +6,7 @@
     "generate:nns-topics": "node tools/scripts/generate-nns-topics.mjs",
     "build:frontend": "npm run generate:nns-topics && node canisters/frontend/web/build-frontend.mjs",
     "setup:frontend": "npm ci --no-fund --no-audit",
+    "smoke:node-metrics-proxy": "node tools/scripts/smoke-node-metrics-proxy.mjs",
     "smoke:proposal-analysis:mainnet": "node tools/scripts/proposal-analysis-mainnet-smoke.mjs",
     "test:frontend-unit": "node --test canisters/frontend/web/test/*.test.mjs"
   },

@@ -39,7 +39,7 @@ test('direct anchor followees are guaranteed', async () => {
       knownNeuronName: 'Known Anchor',
     })]])),
   });
-  assert.equal(proof.status, 'guaranteed');
+  assert.equal(proof.status, 'guaranteed_yes');
   assert.equal(proof.children[0].knownNeuronName, 'Known Anchor');
   assert.deepEqual(proof.children[0].hotkeys, ['aaaaa-aa', 'bbbbb-bb']);
 });
@@ -51,7 +51,7 @@ test('all transitive anchor-terminated followees are guaranteed', async () => {
     topic,
     neuronLoader: loader(new Map([['2', n2]])),
   });
-  assert.equal(proof.status, 'guaranteed');
+  assert.equal(proof.status, 'guaranteed_yes');
   assert.equal(proof.neuronId, 1n);
   assert.equal(proof.children[0].neuronId, 2n);
 });
@@ -98,14 +98,24 @@ test('cycle is not guaranteed', async () => {
     topic,
     neuronLoader: loader(new Map([['1', n1], ['2', n2]])),
   });
-  assert.equal(proof.status, 'not_guaranteed');
-  assert.equal(proof.reason, 'blocking_followee');
+  assert.equal(proof.status, 'unknown');
+  assert.equal(proof.reason, 'cycle');
 });
 
-test('majority of anchors but not all followees anchor-resolving is not guaranteed', async () => {
+test('2 Yes of 3 is guaranteed yes', async () => {
   const n2 = neuron(2, []);
   const proof = await getGuaranteeStatus({
     neuron: neuron(1, [anchor, GUARANTEE_ANCHOR_NEURONS.omegaVote, 2n]),
+    topic,
+    neuronLoader: loader(new Map([['2', n2]])),
+  });
+  assert.equal(proof.status, 'guaranteed_yes');
+});
+
+test('1 Yes of 2 is not guaranteed yes', async () => {
+  const n2 = neuron(2, []);
+  const proof = await getGuaranteeStatus({
+    neuron: neuron(1, [anchor, 2n]),
     topic,
     neuronLoader: loader(new Map([['2', n2]])),
   });
@@ -119,7 +129,7 @@ test('omega reject plus one other blocker is guaranteed', async () => {
     topic,
     neuronLoader: loader(new Map([['2', n2]])),
   });
-  assert.equal(proof.status, 'guaranteed');
+  assert.equal(proof.status, 'guaranteed_no');
 });
 
 test('omega reject plus one private followee is guaranteed', async () => {
@@ -129,10 +139,10 @@ test('omega reject plus one private followee is guaranteed', async () => {
     topic,
     neuronLoader: loader(new Map([['2', n2]])),
   });
-  assert.equal(proof.status, 'guaranteed');
+  assert.equal(proof.status, 'guaranteed_no');
 });
 
-test('omega reject plus two other blockers is not guaranteed', async () => {
+test('1 No of 3 is not guaranteed no', async () => {
   const n2 = neuron(2, []);
   const n3 = neuron(3, []);
   const proof = await getGuaranteeStatus({
@@ -143,6 +153,17 @@ test('omega reject plus two other blockers is not guaranteed', async () => {
   assert.equal(proof.status, 'not_guaranteed');
 });
 
+test('2 No of 3 is guaranteed no', async () => {
+  const n2 = neuron(2, [GUARANTEE_ANCHOR_NEURONS.omegaReject]);
+  const n3 = neuron(3, []);
+  const proof = await getGuaranteeStatus({
+    neuron: neuron(1, [GUARANTEE_ANCHOR_NEURONS.omegaReject, 2n, 3n]),
+    topic,
+    neuronLoader: loader(new Map([['2', n2], ['3', n3]])),
+  });
+  assert.equal(proof.status, 'guaranteed_no');
+});
+
 test('omega reject plus one cyclic followee is guaranteed transitively', async () => {
   const n1 = neuron(1, [2n]);
   const n2 = neuron(2, [GUARANTEE_ANCHOR_NEURONS.omegaReject, 1n]);
@@ -151,6 +172,6 @@ test('omega reject plus one cyclic followee is guaranteed transitively', async (
     topic,
     neuronLoader: loader(new Map([['1', n1], ['2', n2]])),
   });
-  assert.equal(proof.status, 'guaranteed');
-  assert.equal(proof.children[0].status, 'guaranteed');
+  assert.equal(proof.status, 'guaranteed_no');
+  assert.equal(proof.children[0].status, 'guaranteed_no');
 });

@@ -1,0 +1,27 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - run: npm ci --no-fund --no-audit
+      - run: npm run test:frontend-unit
+      - run: cargo fmt --all -- --check
+      - run: cargo test --workspace
+      - run: npm run build:frontend
+      - run: cargo build --package nnx-frontend --target wasm32-unknown-unknown --release
+      - run: node tools/scripts/check-frontend-artifacts.mjs
+      - run: node tools/scripts/check-boundaries.mjs

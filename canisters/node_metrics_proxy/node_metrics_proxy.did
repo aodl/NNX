@@ -1,0 +1,30 @@
+type NodeMetricsHistoryArgs = record {
+  subnet_id : principal;
+  start_at_timestamp_nanos : nat64;
+  end_at_timestamp_nanos : nat64;
+};
+
+type NodeMetricsHistoryRecord = record {
+  node_id : principal;
+  timestamp_nanos : nat64;
+  num_blocks_proposed_total : nat64;
+  num_block_failures_total : nat64;
+};
+
+type NodeMetricsError = record {
+  code : text;
+  message : text;
+};
+
+type NodeMetricsHistoryResponse = record {
+  subnet_id : principal;
+  start_at_timestamp_nanos : nat64;
+  end_at_timestamp_nanos : nat64;
+  records : vec NodeMetricsHistoryRecord;
+  partial : bool;
+  errors : vec NodeMetricsError;
+};
+
+service : {
+  get_node_metrics_history : (NodeMetricsHistoryArgs) -> (NodeMetricsHistoryResponse);
+}

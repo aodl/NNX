@@ -52,6 +52,30 @@ function issueList(title, issues) {
   return section;
 }
 
+function lifecycleLabel(lifecycle) {
+  return {
+    pre_execution: 'pre-execution',
+    post_execution_success: 'post-execution',
+    post_execution_failed: 'failed/rejected',
+    rejected: 'failed/rejected',
+    unknown: 'unknown',
+  }[lifecycle] ?? 'unknown';
+}
+
+function confidenceNotice(confidence) {
+  if (!['medium', 'low', 'unsupported'].includes(confidence)) return null;
+  const note = document.createElement('p');
+  note.className = `analysis-confidence-note ${confidence}`;
+  if (confidence === 'low') {
+    note.textContent = 'Manual review: NNX used low-confidence proposal parsing for this action.';
+  } else if (confidence === 'unsupported') {
+    note.textContent = 'Unsupported action: NNX shows compact informational analysis only.';
+  } else {
+    note.textContent = 'NNX used structured action data and found extra free-text references.';
+  }
+  return note;
+}
+
 function nodeList(title, nodeIds) {
   const row = document.createElement('div');
   row.className = 'analysis-node-list';
@@ -94,11 +118,17 @@ export function renderProposalAnalysisPanel(analysis) {
   }
 
   const groups = groupIssuesBySeverity(analysis.issues);
+  const lifecycle = document.createElement('div');
+  lifecycle.className = 'analysis-lifecycle-mode';
+  lifecycle.textContent = `Lifecycle mode: ${lifecycleLabel(analysis.lifecycle)}`;
+  section.append(lifecycle);
+  const parserNote = confidenceNotice(analysis.confidence);
+  if (parserNote) section.append(parserNote);
   for (const group of [
     issueList('Critical issues', groups.critical),
     issueList('Warnings', groups.warning),
-    issueList('Informational findings', groups.info),
     issueList('Manual review', groups.manual_review),
+    issueList('Informational findings', groups.info),
   ]) {
     if (group) section.append(group);
   }
@@ -137,6 +167,11 @@ export function renderProposalAnalysisPanel(analysis) {
     }
     section.append(decentralisation);
   }
+
+  const explanation = document.createElement('p');
+  explanation.className = 'proposal-detail-note';
+  explanation.textContent = 'Why this matters: these checks highlight onchain evidence that may affect subnet decentralisation, proposal intent, or manual review needs.';
+  section.append(explanation);
 
   return section;
 }
@@ -186,8 +221,8 @@ export function renderAnalysisNodeDetails(node) {
   const link = document.createElement('a');
   link.href = 'https://www.globalping.io/';
   link.target = '_blank';
-  link.rel = 'noreferrer';
-  link.textContent = 'Open Globalping for manual network-location checks';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Manual external check - Not used by NNX validation';
   actions.append(link);
   panel.append(actions);
   return panel;

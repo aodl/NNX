@@ -11,6 +11,7 @@ export function createIcQueryFacade({ backend }) {
     getIcSubnets: (options) => backend.getIcSubnets(options),
     getIcSubnetNodeCounts: (options) => backend.getIcSubnetNodeCounts(options),
     getIcTopology: (options) => backend.getIcTopology(options),
+    getNodeMetricsHistory: (options) => backend.getNodeMetricsHistory(options),
     getCmcSubnetLabels: () => backend.getCmcSubnetLabels(),
     clearTopologyCache: () => backend.clearTopologyCache(),
     refreshIcTopology: () => backend.refreshIcTopology(),

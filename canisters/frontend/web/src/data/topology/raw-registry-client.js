@@ -356,7 +356,9 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
 
     if (!decoded.value) {
       throw new IcTopologyError(
-        TOPOLOGY_ERROR_CODES.RAW_REGISTRY_UNAVAILABLE,
+        decoded.largeValueChunkKeys
+          ? TOPOLOGY_ERROR_CODES.REGISTRY_LARGE_VALUE_UNSUPPORTED
+          : TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_UNAVAILABLE,
         'Raw Registry get_value returned a chunked or empty value that this client cannot decode.',
       );
     }
@@ -370,7 +372,7 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
       return decodeSubnetListRecord(value);
     } catch (error) {
       throw new IcTopologyError(
-        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED,
         'Failed to decode Registry subnet_list record.',
         error,
       );
@@ -386,7 +388,7 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
       };
     } catch (error) {
       throw new IcTopologyError(
-        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED,
         'Failed to decode Registry node record.',
         error,
       );

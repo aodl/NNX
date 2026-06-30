@@ -3,6 +3,10 @@ import { getEffectiveFollowees } from './effective-followees.js';
 
 const ANCHORS = new Set(Object.values(GUARANTEE_ANCHOR_NEURONS).map((id) => id.toString()));
 const OMEGA_REJECT_ID = GUARANTEE_ANCHOR_NEURONS.omegaReject.toString();
+const YES_ANCHORS = new Set([
+  GUARANTEE_ANCHOR_NEURONS.alphaVote.toString(),
+  GUARANTEE_ANCHOR_NEURONS.omegaVote.toString(),
+]);
 
 function result(status, reason = null, extra = {}) {
   return {
@@ -26,24 +30,26 @@ function neuronProofFields(neuron) {
 
 function mergeChildren(neuron, children) {
   const parent = neuronProofFields(neuron);
-  const hasOmegaReject = children.some((child) => child.neuronId?.toString() === OMEGA_REJECT_ID);
-  if (hasOmegaReject && children.length <= 2) {
-    return result('guaranteed', null, { ...parent, children });
-  }
+  const total = children.length;
+  const yes = children.filter((child) => child.status === 'guaranteed_yes').length;
+  const no = children.filter((child) => child.status === 'guaranteed_no').length;
+  if (yes * 2 > total) return result('guaranteed_yes', null, { ...parent, children });
+  if (no * 2 >= total) return result('guaranteed_no', null, { ...parent, children });
 
-  const unknown = children.find((child) => child.status === 'unknown');
-  if (unknown) return result('unknown', unknown.reason, { ...parent, children, depthLimitReached: unknown.depthLimitReached });
-  const privateChild = children.find((child) => child.status === 'private');
-  if (privateChild) return result('unknown', 'private_followee', { ...parent, children });
-  const blocker = children.find((child) => child.status !== 'guaranteed');
-  if (blocker) {
-    return result('not_guaranteed', 'blocking_followee', {
+  const unresolved = children.find((child) => child.status === 'unknown' || child.status === 'private');
+  if (unresolved) {
+    return result('unknown', unresolved.reason ?? 'unresolved_path', {
       ...parent,
       children,
-      blockingFolloweeId: blocker.neuronId ?? blocker.blockingFolloweeId,
+      depthLimitReached: unresolved.depthLimitReached,
     });
   }
-  return result('guaranteed', null, { ...parent, children });
+  const blocker = children.find((child) => child.status === 'not_guaranteed');
+  return result('not_guaranteed', blocker?.reason ?? 'threshold_not_met', {
+    ...parent,
+    children,
+    blockingFolloweeId: blocker?.neuronId ?? blocker?.blockingFolloweeId ?? null,
+  });
 }
 
 export async function getGuaranteeStatus({ neuron, topic, neuronLoader, maxDepth = MAX_GUARANTEE_DEPTH }) {
@@ -55,11 +61,15 @@ async function prove({ neuron, topic, neuronLoader, maxDepth, depth, visited }) 
   if (neuron.followeesPrivate) return result('private');
 
   const key = `${neuron.id.toString()}:${topic.id}`;
-  if (visited.has(key)) return result('not_guaranteed', 'cycle', neuronProofFields(neuron));
+  if (visited.has(key)) return result('unknown', 'cycle', neuronProofFields(neuron));
   if (depth > maxDepth) return result('unknown', 'depth_limit', neuronProofFields(neuron));
 
   if (ANCHORS.has(neuron.id.toString())) {
-    return result('guaranteed', null, neuronProofFields(neuron));
+    return result(
+      YES_ANCHORS.has(neuron.id.toString()) ? 'guaranteed_yes' : 'guaranteed_no',
+      null,
+      neuronProofFields(neuron),
+    );
   }
 
   const effective = getEffectiveFollowees(neuron, topic);
@@ -83,7 +93,7 @@ async function prove({ neuron, topic, neuronLoader, maxDepth, depth, visited }) 
       } catch {
         knownNeuronName = null;
       }
-      children.push(result('guaranteed', null, {
+      children.push(result(YES_ANCHORS.has(followeeId.toString()) ? 'guaranteed_yes' : 'guaranteed_no', null, {
         neuronId: followeeId,
         knownNeuronName,
         hotkeys,

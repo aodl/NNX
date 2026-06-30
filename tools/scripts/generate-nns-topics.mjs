@@ -1,5 +1,6 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const protoUrl =
   'https://raw.githubusercontent.com/dfinity/ic/master/rs/nns/governance/proto/ic_nns_governance/pb/v1/governance.proto';
@@ -35,20 +36,25 @@ const fallbackProto = `enum Topic {
   TOPIC_SERVICE_NERVOUS_SYSTEM_MANAGEMENT = 18;
 }`;
 
-async function loadProto() {
+export async function loadProto({
+  fetchImpl = fetch,
+  protoUrlOverride = protoUrl,
+  cachePathOverride = cachePath,
+  allowEmbedded = process.env.NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK === '1',
+} = {}) {
   try {
-    const response = await fetch(protoUrl);
+    const response = await fetchImpl(protoUrlOverride);
     if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
     return await response.text();
   } catch (error) {
     try {
-      const cachedProto = await readFile(cachePath, 'utf8');
+      const cachedProto = await readFile(cachePathOverride, 'utf8');
       console.warn(
-        `Warning: could not fetch upstream governance.proto; using pinned cache at ${path.relative(process.cwd(), cachePath)}: ${error.message}`,
+        `Warning: could not fetch upstream governance.proto; using pinned cache at ${path.relative(process.cwd(), cachePathOverride)}: ${error.message}`,
       );
       return cachedProto;
     } catch (cacheError) {
-      if (process.env.NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK === '1') {
+      if (allowEmbedded) {
         console.warn(
           `Warning: could not fetch upstream governance.proto or read pinned cache; using embedded fallback because NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK=1: ${error.message}; cache error: ${cacheError.message}`,
         );
@@ -56,16 +62,16 @@ async function loadProto() {
       }
 
       throw new Error(
-        `Could not fetch upstream governance.proto and no pinned cache was available at ${path.relative(
-          process.cwd(),
-          cachePath,
+          `Could not fetch upstream governance.proto and no pinned cache was available at ${path.relative(
+            process.cwd(),
+            cachePathOverride,
         )}. Set NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK=1 to use the embedded emergency fallback. Fetch error: ${error.message}; cache error: ${cacheError.message}`,
       );
     }
   }
 }
 
-function parseTopicEnum(proto) {
+export function parseTopicEnum(proto) {
   const match = proto.match(/enum\s+Topic\s*\{([\s\S]*?)\n\}/);
   if (!match) throw new Error('Could not find enum Topic in governance.proto');
 
@@ -95,7 +101,7 @@ function toLabel(protoName) {
     .replace('And', '&');
 }
 
-async function main() {
+export async function main() {
   const topics = parseTopicEnum(await loadProto());
   const body = topics
     .map((topic) => `  {
@@ -121,9 +127,11 @@ ${body}
   );
 }
 
-try {
-  await main();
-} catch (error) {
-  console.error(`generate-nns-topics failed: ${error.message}`);
-  process.exitCode = 1;
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  try {
+    await main();
+  } catch (error) {
+    console.error(`generate-nns-topics failed: ${error.message}`);
+    process.exitCode = 1;
+  }
 }

@@ -23,9 +23,11 @@ thread_local! {
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/public");
 
 const PRIVATE_BUILD_MANIFEST_PATH: &str = "generated/frontend-bundle.json";
+const PUBLIC_FRONTEND_ENV_PATH: &str = "generated/frontend-env.json";
 const PLACEHOLDER_BUNDLE_PATH: &str = "/generated/app.placeholder.js";
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
+const NODE_METRICS_PROXY_ENV: &str = "PUBLIC_CANISTER_ID:nnx_node_metrics_proxy";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct HeadAssetKey {
@@ -201,6 +203,14 @@ fn certify_all_assets() {
         AssetConfig::File {
             path: "map/ne_110m_land.geojson".to_string(),
             content_type: Some("application/geo+json".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
+        AssetConfig::File {
+            path: PUBLIC_FRONTEND_ENV_PATH.to_string(),
+            content_type: Some("application/json".to_string()),
             headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
             fallback_for: vec![],
             aliased_by: vec![],
@@ -565,6 +575,9 @@ fn is_public_route(path: &str) -> bool {
     if path.starts_with("/generated/app.") && path.ends_with(".js") {
         return true;
     }
+    if path == "/generated/frontend-env.json" {
+        return true;
+    }
     is_valid_id_route(path, "/neuron/")
         || is_valid_id_route(path, "/proposal/")
         || is_valid_principal_route(path, "/subnet/")
@@ -721,12 +734,18 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
             "index.html" | "404.html" => "text/html",
             ".well-known/ic-domains" => "text/plain",
             "map/ne_110m_land.geojson" => "application/geo+json",
+            "generated/frontend-env.json" => "application/json",
             _ if path.ends_with(".js") => "text/javascript",
             _ if path.ends_with(".css") => "text/css",
             _ => "application/octet-stream",
         }
         .to_string(),
     ));
+    if matches!(path, "index.html" | "404.html") {
+        if let Some(cookie) = ic_env_cookie_header() {
+            headers.push(cookie);
+        }
+    }
     headers.push((
         CERTIFICATE_EXPRESSION_HEADER_NAME.to_string(),
         DefaultCelBuilder::full_certification()
@@ -737,6 +756,33 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
             .to_string(),
     ));
     headers
+}
+
+#[cfg(not(test))]
+fn canister_env_value(name: &str) -> Option<String> {
+    if !ic_cdk::api::env_var_name_exists(name) {
+        return None;
+    }
+    let value = ic_cdk::api::env_var_value(name);
+    (!value.is_empty()).then_some(value)
+}
+
+#[cfg(test)]
+fn canister_env_value(_name: &str) -> Option<String> {
+    None
+}
+
+fn ic_env_cookie_header() -> Option<HeaderField> {
+    let proxy_id = canister_env_value(NODE_METRICS_PROXY_ENV)?;
+    let mut values = Vec::new();
+    if let Some(root_key) = canister_env_value("IC_ROOT_KEY") {
+        values.push(format!("ic_root_key={root_key}"));
+    }
+    values.push(format!("{NODE_METRICS_PROXY_ENV}={proxy_id}"));
+    Some((
+        "set-cookie".to_string(),
+        format!("ic_env={}; Path=/; SameSite=Strict", values.join("&")),
+    ))
 }
 
 fn asset_headers(corp: &str, cache_control: &str) -> Vec<HeaderField> {

@@ -296,11 +296,11 @@ function notesCell(proof, topic, topicAnalysis) {
     return td;
   }
 
-  if (proof.status === 'guaranteed') {
+  if (proof.status === 'guaranteed_yes' || proof.status === 'guaranteed_no') {
     td.append(noteBadge(
       'status guaranteed',
-      'Guaranteed to vote',
-      'This neuron is guaranteed to cast a vote because every required followee path reaches an Alpha/Omega voting neuron under the conservative all-followees rule.',
+      proof.status === 'guaranteed_yes' ? 'Guaranteed to vote Yes' : 'Guaranteed to vote No',
+      'This neuron has enough known effective followees to prove the NNS topic threshold outcome.',
     ));
     return td;
   }
@@ -396,7 +396,11 @@ export async function renderTopicTable({ neuron, neuronLoader }) {
       ? { status: 'private', depthLimitReached: false }
       : await getGuaranteeStatus({ neuron, topic, neuronLoader }));
 
-    if (topic.key !== NEURON_MANAGEMENT_TOPIC_KEY && proof.status !== 'guaranteed') {
+    if (
+      topic.key !== NEURON_MANAGEMENT_TOPIC_KEY
+      && proof.status !== 'guaranteed_yes'
+      && proof.status !== 'guaranteed_no'
+    ) {
       warnings.push({ topic, message: warningMessage(proof) });
     }
 

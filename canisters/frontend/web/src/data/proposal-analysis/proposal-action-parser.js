@@ -1,4 +1,4 @@
-import { Principal } from '@icp-sdk/core/principal';
+import { normalizePrincipalText } from '../query/principal-text.js';
 
 const PRINCIPAL_PATTERN = /\b[a-z0-9]{5}(?:-[a-z0-9]{2,5})+\b/g;
 
@@ -19,12 +19,7 @@ function unique(values) {
 }
 
 export function principalText(value) {
-  if (typeof value !== 'string' || value.length === 0) return null;
-  try {
-    return Principal.fromText(value).toText();
-  } catch {
-    return null;
-  }
+  return normalizePrincipalText(value);
 }
 
 function principalsFromText(text) {
@@ -95,12 +90,17 @@ function subnetIdsFromStructuredValues(proposal) {
 }
 
 function nodeIdsFromStructuredValues(proposal) {
-  return unique(namedValuePrincipals(proposal, /node/i));
+  return unique(namedValuePrincipals(proposal, /node/i).filter((id) => (
+    !subnetIdsFromStructuredValues(proposal).includes(id)
+  )));
 }
 
 function classifyAddRemove(proposal, fallbackNodeIds = []) {
-  const addNodeIds = namedValuePrincipals(proposal, /add|new|membership/i);
-  const removeNodeIds = namedValuePrincipals(proposal, /remove|deleted/i);
+  const subnetIds = subnetIdsFromStructuredValues(proposal);
+  const addNodeIds = namedValuePrincipals(proposal, /add|new|membership/i)
+    .filter((id) => !subnetIds.includes(id));
+  const removeNodeIds = namedValuePrincipals(proposal, /remove|deleted/i)
+    .filter((id) => !subnetIds.includes(id));
   if (addNodeIds.length || removeNodeIds.length) {
     return { addNodeIds, removeNodeIds };
   }
@@ -143,11 +143,19 @@ export function parseProposalIntent(proposal) {
     isApiBoundaryAction = true;
     removeNodeIds = structuredPrincipals.length ? structuredPrincipals : fallbackPrincipals;
   } else {
-    confidence = 'low';
+    confidence = 'unsupported';
   }
 
   if (fallbackOnly && fallbackPrincipals.length > 0) {
     warnings.push('Parsed principal references from free text fallback.');
+  }
+  if (!fallbackOnly && fallbackPrincipals.length > 0) {
+    const structuredSet = new Set([...structuredPrincipals, ...referencedSubnetIds]);
+    const conflictingFallbacks = fallbackPrincipals.filter((id) => !structuredSet.has(id));
+    if (conflictingFallbacks.length > 0) {
+      confidence = confidence === 'high' ? 'medium' : confidence;
+      warnings.push('Structured action fields differed from free text principal references; structured values were used.');
+    }
   }
   if (actionKind !== 'Unsupported' && addNodeIds.length === 0 && removeNodeIds.length === 0) {
     confidence = 'low';

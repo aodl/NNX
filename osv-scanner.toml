@@ -1,0 +1,11 @@
+[[IgnoredVulns]]
+id = "RUSTSEC-2024-0436"
+reason = "Transitive candid dependency on paste; no safe direct replacement available in this repo."
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2021-0127"
+reason = "Transitive ic-http-certification dependency on serde_cbor; tracked through cargo audit/deny policy."
+
+[[IgnoredVulns]]
+id = "GHSA-g7r4-m6w7-qqqr"
+reason = "Low-severity esbuild development-server issue on Windows; NNX does not run esbuild dev server in production."

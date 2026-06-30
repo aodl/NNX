@@ -5,6 +5,12 @@ canisters:
         - type: script
           commands:
             - ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
+  - name: nnx_node_metrics_proxy
+    build:
+      steps:
+        - type: script
+          commands:
+            - ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
 
 networks:
   - name: local
@@ -18,7 +24,9 @@ environments:
     network: local
     canisters:
       - nnx_frontend
+      - nnx_node_metrics_proxy
   - name: ic
     network: ic
     canisters:
       - nnx_frontend
+      - nnx_node_metrics_proxy

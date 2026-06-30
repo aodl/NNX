@@ -1,4 +1,5 @@
 import { HttpAgent } from '@icp-sdk/core/agent';
+import { safeGetCanisterEnv } from '@icp-sdk/core/agent/canister-env';
 import { createActor as createCmcActor } from '../../../declarations/nns_cmc/index.js';
 import { createActor as createGovernanceActor } from '../../../declarations/nns_governance/index.js';
 import { createActor as createRegistryActor } from '../../../declarations/nns_registry/index.js';
@@ -11,6 +12,10 @@ import { createRawRegistryClient } from '../topology/raw-registry-client.js';
 import { createTopologyService } from '../topology/topology-service.js';
 import { IcTopologyError, TOPOLOGY_ERROR_CODES } from '../topology/topology-errors.js';
 import {
+  createNodeMetricsProxyActor,
+  createNodeMetricsProxyClient,
+} from '../node-health-metrics/node-metrics-proxy-client.js';
+import {
   normalizeCmcDefaultSubnetsResponse,
   normalizeCmcSubnetLabelsResponse,
   normalizeKnownNeuronNamesResponse,
@@ -22,6 +27,34 @@ import {
 const KNOWN_NEURON_CACHE_MS = 60 * 60 * 1000;
 const PROPOSAL_REWARD_STATUS_ACCEPT_VOTES = 1;
 const PROPOSAL_PAGE_LIMIT = 100;
+const NODE_METRICS_PROXY_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
+
+function canisterEnvValue(name) {
+  const sdkEnv = safeGetCanisterEnv?.() ?? null;
+  if (sdkEnv?.[name]) return sdkEnv[name];
+  const cookie = globalThis.document?.cookie
+    ?.split(';')
+    .find((item) => item.trim().startsWith('ic_env='));
+  if (!cookie) return null;
+  const value = decodeURIComponent(cookie.split('=').slice(1).join('='));
+  for (const part of value.split('&')) {
+    const separator = part.indexOf('=');
+    if (separator < 0) continue;
+    if (part.slice(0, separator) === name) return part.slice(separator + 1);
+  }
+  return null;
+}
+
+async function generatedFrontendEnvValue(name) {
+  try {
+    const response = await fetch('/generated/frontend-env.json', { cache: 'no-store' });
+    if (!response.ok) return null;
+    const env = await response.json();
+    return typeof env?.[name] === 'string' && env[name] ? env[name] : null;
+  } catch {
+    return null;
+  }
+}
 
 export function listAcceptingVotesProposalsRequest(beforeProposalId = null) {
   return {
@@ -80,6 +113,7 @@ export async function createAgentQueryBackend({
   cmcCanisterId = NNS_CMC_CANISTER_ID,
   governanceCanisterId = NNS_GOVERNANCE_CANISTER_ID,
   registryCanisterId = NNS_REGISTRY_CANISTER_ID,
+  nodeMetricsProxyCanisterId = null,
 } = {}) {
   let agent;
   try {
@@ -116,6 +150,15 @@ export async function createAgentQueryBackend({
 
   const rawRegistryClient = createRawRegistryClient({ agent, registryCanisterId });
   const topologyService = createTopologyService({ governance, registry, rawRegistryClient });
+  const resolvedNodeMetricsProxyCanisterId = nodeMetricsProxyCanisterId
+    ?? canisterEnvValue(NODE_METRICS_PROXY_ENV)
+    ?? await generatedFrontendEnvValue(NODE_METRICS_PROXY_ENV)
+    ?? null;
+  const nodeMetricsProxyClient = createNodeMetricsProxyClient({
+    actor: resolvedNodeMetricsProxyCanisterId
+      ? createNodeMetricsProxyActor({ agent, canisterId: resolvedNodeMetricsProxyCanisterId })
+      : null,
+  });
   let knownNeuronNames = new Map();
   let knownNeuronFetchedAt = 0;
   let knownNeuronRefresh = null;
@@ -224,6 +267,7 @@ export async function createAgentQueryBackend({
     getIcSubnets: topologyService.getIcSubnets,
     getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,
+    getNodeMetricsHistory: nodeMetricsProxyClient.getNodeMetricsHistory,
     getCmcSubnetLabels,
     refreshIcTopology: topologyService.refreshIcTopology,
     clearTopologyCache: topologyService.clearTopologyCache,

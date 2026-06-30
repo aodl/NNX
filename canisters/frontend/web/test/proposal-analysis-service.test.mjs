@@ -57,3 +57,89 @@ test('RemoveNodesFromSubnet infers target subnet before loading metric context',
   assert.equal(analysis.metrics.diversity.after.nodeProviders, 2);
   assert.equal(analysis.metrics.distance.before.pairCount, 3);
 });
+
+function removeNodeProposal(id = 11n) {
+  return {
+    id,
+    statusKind: 'Open',
+    actionTypeName: 'RemoveNodesFromSubnet',
+    actionValues: [{ name: 'nodes', value: nodeA }],
+  };
+}
+
+function nonRemoveProposal(id = 12n) {
+  return {
+    id,
+    statusKind: 'Open',
+    actionTypeName: 'BlessReplicaVersion',
+    actionValues: [],
+  };
+}
+
+function queryFacadeForModeTests({ proposals = [removeNodeProposal()], metricsResult = null } = {}) {
+  let metricsCalls = 0;
+  return {
+    get metricsCalls() {
+      return metricsCalls;
+    },
+    getOpenNnsProposals: async () => proposals,
+    getNnsProposal: async () => proposals[0] ?? null,
+    getIcSubnets: async () => [{ id: subnetId, nodeIds: [nodeA, nodeB] }],
+    getIcTopology: async () => ({}),
+    getCmcSubnetLabels: async () => ({}),
+    getIcNodeDetails: async ({ nodeIds }) => ({
+      nodeLocations: nodeIds.map((nodeId) => nodeLocation(nodeId, `provider-${nodeId}`, 40, -74)),
+      warnings: [],
+    }),
+    getIcSubnetDetails: async () => ({ subnet: { id: subnetId, nodeIds: [nodeA, nodeB] } }),
+    getNodeMetricsHistory: async () => {
+      metricsCalls += 1;
+      return metricsResult ?? {
+        subnetId,
+        startAtTimestampNanos: 1n,
+        endAtTimestampNanos: 2n,
+        records: [],
+        partial: false,
+        errors: [],
+      };
+    },
+  };
+}
+
+test('analyzeOpenProposals summary mode does not call node metrics', async () => {
+  const queryFacade = queryFacadeForModeTests();
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  await analysisService.analyzeOpenProposals({ mode: 'summary' });
+  assert.equal(queryFacade.metricsCalls, 0);
+});
+
+test('proposal detail full mode calls node metrics for remove-node proposal only', async () => {
+  const queryFacade = queryFacadeForModeTests({ proposals: [removeNodeProposal()] });
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  await analysisService.analyzeProposalObject({ proposal: removeNodeProposal(), mode: 'full' });
+  assert.equal(queryFacade.metricsCalls, 1);
+});
+
+test('non-remove proposals never call node metrics', async () => {
+  const queryFacade = queryFacadeForModeTests({ proposals: [nonRemoveProposal()] });
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  await analysisService.analyzeProposalObject({ proposal: nonRemoveProposal(), mode: 'full' });
+  assert.equal(queryFacade.metricsCalls, 0);
+});
+
+test('failed metrics call produces manual-review issue without crashing', async () => {
+  const queryFacade = queryFacadeForModeTests({
+    metricsResult: {
+      subnetId,
+      startAtTimestampNanos: 1n,
+      endAtTimestampNanos: 2n,
+      records: [],
+      partial: true,
+      errors: [{ code: 'MANAGEMENT_CANISTER_CALL_FAILED', message: 'unsupported' }],
+    },
+  });
+  const analysisService = createProposalAnalysisService({ queryFacade });
+  const analysis = await analysisService.analyzeProposalObject({ proposal: removeNodeProposal(), mode: 'full' });
+  assert.equal(queryFacade.metricsCalls, 1);
+  assert.equal(analysis.summary.manualReviewCount > 0, true);
+});

@@ -1,3 +1,7 @@
+import { getSubnetNodeHealthMetrics } from './node-health-metrics/node-health-metrics.js';
+import { NODE_HEALTH_SIGNALS } from './node-health-metrics/node-health-policy.js';
+import { createRequestCache } from './request-cache.js';
+
 export function labelizeIdentifier(value) {
   if (typeof value !== 'string' || value.length === 0) return 'Unknown';
   return value
@@ -107,10 +111,12 @@ export function groupNodeLocations(nodeLocations) {
         nodeOperatorIds: new Set(),
         nodeProviderIds: new Set(),
         proposalIntentCounts: { add: 0, remove: 0, neutral: 0 },
+        nodes: [],
       };
       groupsByKey.set(key, group);
     }
     group.nodeIds.push(location.nodeId);
+    group.nodes.push(location);
     if (location.nodeOperatorId) group.nodeOperatorIds.add(location.nodeOperatorId);
     if (location.nodeProviderId) group.nodeProviderIds.add(location.nodeProviderId);
     if (location.proposalIntent === 'add') {
@@ -141,6 +147,10 @@ export function groupNodeLocations(nodeLocations) {
 }
 
 export function createSubnetLoader({ queryFacade }) {
+  const metricsCache = createRequestCache({
+    debug: globalThis.localStorage?.getItem?.('nnxDebug') === '1',
+  });
+
   async function loadSubnetGroups() {
     const [subnetResult, cmcResult] = await Promise.all([
       queryFacade.getIcSubnets(),
@@ -178,11 +188,40 @@ export function createSubnetLoader({ queryFacade }) {
       cmcResult?.publicSubnetIds ?? [],
     );
     const nodeLocations = detailResult?.nodeLocations ?? [];
+    let nodeHealthMetrics = null;
+    if (subnet?.nodeIds?.length) {
+      const endAtTimestampNanos = BigInt(Date.now()) * 1_000_000n;
+      const windowHours = 24;
+      const startAtTimestampNanos = endAtTimestampNanos - BigInt(windowHours * 60 * 60) * 1_000_000_000n;
+      const metricsCacheKey = `node-health:${subnetId}:${windowHours}:${subnet.nodeIds.join(',')}`;
+      nodeHealthMetrics = await metricsCache.get(metricsCacheKey, () => getSubnetNodeHealthMetrics({
+        queryFacade,
+        subnetId,
+        nodeIds: subnet.nodeIds,
+        startAtTimestampNanos,
+        endAtTimestampNanos,
+        windowHours,
+      }));
+      for (const metric of nodeHealthMetrics.metrics ?? []) {
+        const location = nodeLocations.find((item) => item.nodeId === metric.nodeId);
+        if (location) location.healthSignal = metric.healthSignal;
+      }
+    } else {
+      nodeHealthMetrics = {
+        subnetId,
+        windowHours: 24,
+        metrics: [],
+        summary: Object.fromEntries(Object.values(NODE_HEALTH_SIGNALS).map((signal) => [signal, 0])),
+        partial: false,
+        errors: [],
+      };
+    }
 
     return {
       subnet: subnet ?? null,
       nodeLocations,
       locationGroups: groupNodeLocations(nodeLocations),
+      nodeHealthMetrics,
       warnings,
     };
   }

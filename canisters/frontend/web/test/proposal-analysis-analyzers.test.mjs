@@ -4,6 +4,7 @@ import { apiBoundaryNodeAnalyzer } from '../src/data/proposal-analysis/analyzers
 import { createSubnetAnalyzer } from '../src/data/proposal-analysis/analyzers/create-subnet-analyzer.js';
 import { dfinityProviderAnalyzer } from '../src/data/proposal-analysis/analyzers/dfinity-provider-analyzer.js';
 import { nodeConflictAnalyzer } from '../src/data/proposal-analysis/analyzers/node-conflict-analyzer.js';
+import { nodeMetricsAnalyzer } from '../src/data/proposal-analysis/analyzers/node-metrics-analyzer.js';
 import { subnetMembershipAnalyzer } from '../src/data/proposal-analysis/analyzers/subnet-membership-analyzer.js';
 import { DFINITY_NODE_PROVIDER_ID } from '../src/data/proposal-analysis/analysis-policy.js';
 import { PROPOSAL_ISSUE_CODES } from '../src/data/proposal-analysis/issue-codes.js';
@@ -43,6 +44,8 @@ function ctx(overrides = {}) {
     analysisContext: {
       nodesById,
       apiBoundaryNodeIds: overrides.apiBoundaryNodeIds ?? [],
+      nodeHealthMetrics: overrides.nodeHealthMetrics ?? null,
+      nodeHealthMetricsByNodeId: overrides.nodeHealthMetricsByNodeId ?? {},
       openProposals: [],
       findCurrentSubnetForNode,
     },
@@ -167,4 +170,44 @@ test('node conflict detects multiple open proposals', () => {
     ],
   }));
   assert.equal(result.issues[0].severity, 'critical');
+});
+
+test('node metrics analyzer emits measured remove-node evidence', () => {
+  const result = nodeMetricsAnalyzer.analyze(ctx({
+    intent: { actionKind: 'RemoveNodesFromSubnet', removeNodeIds: ['remove'], allNodeIds: ['remove'] },
+    nodeHealthMetrics: { subnetId: 'subnetA', windowHours: 24, summary: { elevated_failure_signal: 1 }, errors: [] },
+    nodeHealthMetricsByNodeId: {
+      remove: {
+        nodeId: 'remove',
+        windowHours: 24,
+        proposedDelta: 10,
+        failedDelta: 3,
+        failureRate: 0.23,
+        sampleSize: 13,
+        healthSignal: 'elevated_failure_signal',
+      },
+    },
+  }));
+  assert.ok(codes(result).includes(PROPOSAL_ISSUE_CODES.REMOVE_NODE_HAS_ELEVATED_FAILURE_SIGNAL));
+  assert.ok(codes(result).includes(PROPOSAL_ISSUE_CODES.SUBNET_NODE_FAILURE_SIGNAL_SUMMARY));
+});
+
+test('node metrics analyzer phrases absence of evidence without overclaiming', () => {
+  const result = nodeMetricsAnalyzer.analyze(ctx({
+    intent: { actionKind: 'RemoveNodesFromSubnet', removeNodeIds: ['remove'], allNodeIds: ['remove'] },
+    nodeHealthMetrics: { subnetId: 'subnetA', windowHours: 24, summary: {}, errors: [] },
+    nodeHealthMetricsByNodeId: {
+      remove: {
+        nodeId: 'remove',
+        windowHours: 24,
+        proposedDelta: 20,
+        failedDelta: 0,
+        failureRate: 0,
+        sampleSize: 20,
+        healthSignal: 'healthy_signal',
+      },
+    },
+  }));
+  const issue = result.issues.find((item) => item.code === PROPOSAL_ISSUE_CODES.REMOVE_NODE_HAS_NO_ELEVATED_FAILURE_SIGNAL);
+  assert.match(issue.message, /did not observe an elevated failure signal/);
 });

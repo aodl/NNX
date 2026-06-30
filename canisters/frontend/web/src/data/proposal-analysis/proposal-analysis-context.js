@@ -1,3 +1,5 @@
+import { getSubnetNodeHealthMetrics } from '../node-health-metrics/node-health-metrics.js';
+
 function toObjectById(items = []) {
   return Object.fromEntries(items.filter((item) => item?.id).map((item) => [item.id, item]));
 }
@@ -92,6 +94,7 @@ export async function loadProposalAnalysisContext({
   intent = null,
   openProposals = null,
   baseContext = null,
+  includeNodeMetrics = true,
 } = {}) {
   const base = baseContext ?? await loadProposalAnalysisBaseContext({ queryFacade, openProposals });
   const warnings = [...(base.warnings ?? [])];
@@ -107,6 +110,8 @@ export async function loadProposalAnalysisContext({
     targetNodeIds = subnetsById[effectiveTargetSubnetId].nodeIds ?? [];
   }
   const nodeIdsToLoad = [...new Set([...(intent?.allNodeIds ?? []), ...targetNodeIds])];
+  let nodeHealthMetrics = null;
+  let nodeHealthMetricsByNodeId = {};
 
   let nodeDetails = { nodeLocations: [], warnings: [] };
   if (nodeIdsToLoad.length > 0) {
@@ -128,6 +133,28 @@ export async function loadProposalAnalysisContext({
     nodeLocationsByNodeId[nodeId] = node;
   }
 
+  if (
+    includeNodeMetrics
+    && effectiveTargetSubnetId
+    && targetNodeIds.length > 0
+    && intent?.actionKind === 'RemoveNodesFromSubnet'
+  ) {
+    const endAtTimestampNanos = BigInt(Date.now()) * 1_000_000n;
+    const windowHours = 24;
+    const startAtTimestampNanos = endAtTimestampNanos - BigInt(windowHours * 60 * 60) * 1_000_000_000n;
+    nodeHealthMetrics = await getSubnetNodeHealthMetrics({
+      queryFacade,
+      subnetId: effectiveTargetSubnetId,
+      nodeIds: targetNodeIds,
+      startAtTimestampNanos,
+      endAtTimestampNanos,
+      windowHours,
+    });
+    nodeHealthMetricsByNodeId = Object.fromEntries(
+      (nodeHealthMetrics.metrics ?? []).map((metric) => [metric.nodeId, metric]),
+    );
+  }
+
   return {
     proposal,
     openProposals: normalizedOpenProposals,
@@ -142,6 +169,8 @@ export async function loadProposalAnalysisContext({
     dataCentersById: topology?.dataCentersById ?? {},
     cmcLabels,
     apiBoundaryNodeIds: [],
+    nodeHealthMetrics,
+    nodeHealthMetricsByNodeId,
     warnings,
     allSubnets,
     findCurrentSubnetForNode: (nodeId) => findCurrentSubnetForNode(nodeId, allSubnets),

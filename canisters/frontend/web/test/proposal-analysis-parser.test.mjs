@@ -57,7 +57,7 @@ test('API boundary actions extract nodes', () => {
 test('Unsupported action returns Unsupported and does not throw', () => {
   const intent = parseProposalIntent({ actionTypeName: 'BlessReplicaVersion' });
   assert.equal(intent.actionKind, 'Unsupported');
-  assert.equal(intent.confidence, 'low');
+  assert.equal(intent.confidence, 'unsupported');
 });
 
 test('Fallback free-text parser has low confidence', () => {
@@ -68,4 +68,60 @@ test('Fallback free-text parser has low confidence', () => {
   assert.equal(intent.actionKind, 'ChangeSubnetMembership');
   assert.deepEqual(intent.addNodeIds, [nodeA]);
   assert.equal(intent.confidence, 'low');
+});
+
+test('future unknown action type is unsupported and non-fatal', () => {
+  const intent = parseProposalIntent({
+    actionTypeName: 'FutureNnsActionWithNodes',
+    actionValues: [{ name: 'node_ids', value: nodeA }],
+  });
+  assert.equal(intent.actionKind, 'Unsupported');
+  assert.equal(intent.confidence, 'unsupported');
+  assert.deepEqual(intent.allNodeIds, []);
+});
+
+test('malformed action text does not throw', () => {
+  const intent = parseProposalIntent({
+    actionDescription: 'Add nodes',
+    payloadSearchText: 'node ids: not-a-principal javascript:alert(1)',
+  });
+  assert.equal(intent.actionKind, 'ChangeSubnetMembership');
+  assert.equal(intent.confidence, 'low');
+  assert.deepEqual(intent.allNodeIds, []);
+});
+
+test('missing structured fields falls back to free text', () => {
+  const intent = parseProposalIntent({
+    actionTypeName: 'RemoveNodesFromSubnet',
+    payloadSearchText: `remove ${nodeB}`,
+  });
+  assert.deepEqual(intent.removeNodeIds, [nodeB]);
+  assert.equal(intent.confidence, 'low');
+});
+
+test('structured fields win over conflicting free text with medium confidence', () => {
+  const intent = parseProposalIntent({
+    actionTypeName: 'ChangeSubnetMembership',
+    actionValues: [
+      { name: 'target_subnet_id', value: subnet },
+      { name: 'node_ids_add', value: nodeA },
+    ],
+    payloadSearchText: `old text mentions ${nodeB}`,
+  });
+  assert.deepEqual(intent.addNodeIds, [nodeA]);
+  assert.deepEqual(intent.removeNodeIds, []);
+  assert.equal(intent.confidence, 'medium');
+  assert.match(intent.parseWarnings.join('\n'), /Structured action fields differed/);
+});
+
+test('node-principal versus subnet-principal structured ambiguity keeps subnet out of nodes', () => {
+  const intent = parseProposalIntent({
+    actionTypeName: 'ChangeSubnetMembership',
+    actionValues: [
+      { name: 'target_subnet_id', value: subnet },
+      { name: 'node_ids_add', value: `${nodeA}\n${subnet}` },
+    ],
+  });
+  assert.deepEqual(intent.addNodeIds, [nodeA]);
+  assert.equal(intent.targetSubnetId, subnet);
 });

@@ -38,13 +38,21 @@ function visibleIntentSet(filters) {
 function renderNodeDetails(group, nodeId) {
   const details = document.createElement('div');
   details.className = 'node-location-node-details';
+  const node = group.nodes?.find((item) => item.nodeId === nodeId) ?? {};
 
   const rows = [
-    ['Node', nodeId],
+    ['node ID', nodeId],
+    ['node provider', node.nodeProviderId],
+    ['node operator', node.nodeOperatorId],
     ['Data center', group.dataCenterId ?? 'Unknown'],
     ['Region', group.dataCenterRegion ?? 'Unknown'],
     ['Owner', group.dataCenterOwner ?? 'Unknown'],
-    ['Coordinates', group.gps ? `${group.gps.latitude}, ${group.gps.longitude}` : 'Unknown'],
+    ['Registry GPS', group.gps ? `${group.gps.latitude}, ${group.gps.longitude}` : null],
+    ['domain', node.domain],
+    ['IPv4', node.publicIpv4?.ipAddr],
+    ['HTTP endpoint', node.httpEndpoint],
+    ['XNet endpoint', node.xnetEndpoint],
+    ['metric signal', node.healthSignal],
   ];
 
   for (const [label, value] of rows) {
@@ -52,10 +60,35 @@ function renderNodeDetails(group, nodeId) {
     const key = document.createElement('span');
     key.textContent = label;
     const val = document.createElement('strong');
-    val.textContent = value;
+    val.textContent = value ?? 'Unavailable';
     row.append(key, val);
     details.append(row);
   }
+
+  const actions = document.createElement('div');
+  actions.className = 'analysis-node-actions';
+  for (const [label, value] of [
+    ['Copy node ID', nodeId],
+    ['Copy IPv4', node.publicIpv4?.ipAddr],
+    ['Copy domain', node.domain],
+    ['Copy HTTP endpoint', node.httpEndpoint],
+    ['Copy XNet endpoint', node.xnetEndpoint],
+  ]) {
+    if (!value) continue;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'analysis-copy-button';
+    button.textContent = label;
+    button.addEventListener('click', () => globalThis.navigator?.clipboard?.writeText?.(value));
+    actions.append(button);
+  }
+  const link = document.createElement('a');
+  link.href = 'https://www.globalping.io/';
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Manual external check - Not used by NNX validation';
+  actions.append(link);
+  details.append(actions);
 
   return details;
 }

@@ -3,15 +3,17 @@ import { createSubnetAnalyzer } from './analyzers/create-subnet-analyzer.js';
 import { dfinityProviderAnalyzer } from './analyzers/dfinity-provider-analyzer.js';
 import { diversityAnalyzer } from './analyzers/diversity-analyzer.js';
 import { nodeConflictAnalyzer } from './analyzers/node-conflict-analyzer.js';
+import { nodeMetricsAnalyzer } from './analyzers/node-metrics-analyzer.js';
 import { removeNodesFromSubnetAnalyzer } from './analyzers/remove-nodes-from-subnet-analyzer.js';
 import { subnetMembershipAnalyzer } from './analyzers/subnet-membership-analyzer.js';
 import { unsupportedActionAnalyzer } from './analyzers/unsupported-action-analyzer.js';
+import { PROPOSAL_ISSUE_CODES } from './issue-codes.js';
 import { parseProposalIntent } from './proposal-action-parser.js';
 import {
   loadProposalAnalysisBaseContext,
   loadProposalAnalysisContext,
 } from './proposal-analysis-context.js';
-import { proposalLifecycle, summarizeIssues } from './proposal-analysis-types.js';
+import { createIssue, proposalLifecycle, summarizeIssues } from './proposal-analysis-types.js';
 import { simulateProposalStateChange } from './proposal-state-simulator.js';
 
 export const ANALYZERS = [
@@ -19,6 +21,7 @@ export const ANALYZERS = [
   subnetMembershipAnalyzer,
   createSubnetAnalyzer,
   removeNodesFromSubnetAnalyzer,
+  nodeMetricsAnalyzer,
   apiBoundaryNodeAnalyzer,
   dfinityProviderAnalyzer,
   diversityAnalyzer,
@@ -39,7 +42,12 @@ function targetCurrentNodeIds(intent, context) {
 }
 
 export function createProposalAnalysisService({ queryFacade }) {
-  async function analyzeProposalObject({ proposal, openProposals = null, baseContext = null } = {}) {
+  async function analyzeProposalObject({
+    proposal,
+    openProposals = null,
+    baseContext = null,
+    mode = 'full',
+  } = {}) {
     const intent = parseProposalIntent(proposal);
     const lifecycle = proposalLifecycle(proposal);
     const analysisContext = await loadProposalAnalysisContext({
@@ -48,6 +56,7 @@ export function createProposalAnalysisService({ queryFacade }) {
       intent,
       openProposals,
       baseContext,
+      includeNodeMetrics: mode === 'full',
     });
     const currentNodeIds = targetCurrentNodeIds(intent, analysisContext);
     const stateChange = simulateProposalStateChange({
@@ -69,7 +78,21 @@ export function createProposalAnalysisService({ queryFacade }) {
       concentration: null,
       distance: null,
       dfinityProvider: null,
+      nodeHealth: null,
     };
+    if (intent.confidence === 'low') {
+      issues.push(createIssue({
+        code: PROPOSAL_ISSUE_CODES.LOW_CONFIDENCE_PROPOSAL_PARSE,
+        severity: 'manual_review',
+        lifecycle,
+        title: 'Proposal parsing needs manual review',
+        message: 'NNX used a low-confidence fallback to interpret this proposal action.',
+        proposalId: intent.proposalId,
+        actionKind: intent.actionKind,
+        affected: { nodeIds: intent.allNodeIds, subnetIds: intent.referencedSubnetIds },
+        confidence: 'low',
+      }));
+    }
     const analyzerContext = {
       proposal,
       intent,
@@ -104,22 +127,22 @@ export function createProposalAnalysisService({ queryFacade }) {
   async function analyzeProposal({ proposalId } = {}) {
     const proposal = await queryFacade.getNnsProposal({ proposalId });
     if (!proposal) return null;
-    return analyzeProposalObject({ proposal });
+    return analyzeProposalObject({ proposal, mode: 'full' });
   }
 
-  async function analyzeOpenProposals() {
+  async function analyzeOpenProposals({ mode = 'summary' } = {}) {
     const openProposals = await queryFacade.getOpenNnsProposals();
     const baseContext = await loadProposalAnalysisBaseContext({ queryFacade, openProposals });
     const analyses = [];
     for (const proposal of openProposals) {
-      analyses.push(await analyzeProposalObject({ proposal, openProposals, baseContext }));
+      analyses.push(await analyzeProposalObject({ proposal, openProposals, baseContext, mode }));
     }
     return analyses;
   }
 
   async function analyzeSubnetProposals({ subnetId } = {}) {
     const [analyses, subnetDetail] = await Promise.all([
-      analyzeOpenProposals(),
+      analyzeOpenProposals({ mode: 'summary' }),
       queryFacade.getIcSubnetDetails({ subnetId }).catch(() => ({ subnet: null })),
     ]);
     const subnetNodeIds = new Set(subnetDetail?.subnet?.nodeIds ?? []);

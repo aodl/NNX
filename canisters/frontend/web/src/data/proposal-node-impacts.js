@@ -1,4 +1,4 @@
-import { Principal } from '@icp-sdk/core/principal';
+import { normalizePrincipalText } from './query/principal-text.js';
 import { proposalPayloadText } from './proposal-subnet-impacts.js';
 
 const PRINCIPAL_PATTERN = /\b[a-z0-9]{5}(?:-[a-z0-9]{2,5})+\b/g;
@@ -12,11 +12,7 @@ function normalizeIntentFromName(name) {
 }
 
 function validPrincipalText(value) {
-  try {
-    return Principal.fromText(value).toText();
-  } catch {
-    return null;
-  }
+  return normalizePrincipalText(value);
 }
 
 function extractPrincipalCandidates(text) {

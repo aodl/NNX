@@ -14,7 +14,8 @@ if [[ -z "${ICP_WASM_OUTPUT_PATH:-}" ]]; then
   exit 1
 fi
 
-npm run build:frontend
+frontend_network="${ICP_NETWORK:-${ICP_ENV:-${ICP_ENVIRONMENT:-local}}}"
+ICP_NETWORK="$frontend_network" npm run build:frontend
 cargo build --package "$package_name" --target wasm32-unknown-unknown --release
 
 wasm_name="${package_name//-/_}.wasm"

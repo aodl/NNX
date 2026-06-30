@@ -14,6 +14,7 @@ import { renderNodeGlobePanel } from './node-globe-panel.js';
 import { renderProposalAnalysisPanel } from './proposal-analysis-panel.js';
 import { renderSubnetSummaryPanel } from './subnet-summary-panel.js';
 import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
+import { safeExternalUrl } from '../security/safe-url.js';
 
 function clear(root) {
   root.className = 'shell detail-shell';
@@ -95,12 +96,13 @@ function icon(name) {
 }
 
 function externalLink(url) {
-  if (!url) return 'Unavailable';
+  const safeUrl = safeExternalUrl(url);
+  if (!safeUrl) return 'Unavailable';
   const link = document.createElement('a');
-  link.href = url;
+  link.href = safeUrl;
   link.target = '_blank';
-  link.rel = 'noreferrer';
-  link.textContent = url;
+  link.rel = 'noopener noreferrer';
+  link.textContent = safeUrl;
   return link;
 }
 

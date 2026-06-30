@@ -115,6 +115,7 @@ export function renderProposalPanel({
   emptyText = 'There are currently no NNS proposals accepting votes.',
   statusText = null,
   grouped = true,
+  severityFilters = false,
   className = 'proposal-panel',
 }) {
   const panel = document.createElement('section');
@@ -141,8 +142,42 @@ export function renderProposalPanel({
   if (!grouped) {
     const list = document.createElement('div');
     list.className = 'proposal-list embedded-proposal-list';
+    const cards = [];
     for (const proposal of proposals) {
-      list.append(renderProposalCard(proposal));
+      const card = renderProposalCard(proposal);
+      card.dataset.severities = Object.entries(proposal.analysis?.summary ?? {})
+        .filter(([, count]) => count > 0)
+        .map(([key]) => key.replace('Count', '').replace('manualReview', 'manual_review'))
+        .join(' ');
+      cards.push(card);
+      list.append(card);
+    }
+    if (severityFilters) {
+      const filters = document.createElement('div');
+      filters.className = 'proposal-severity-filters';
+      const active = new Set(['critical', 'warning', 'manual_review', 'info']);
+      for (const [severity, label] of [
+        ['critical', 'Critical'],
+        ['warning', 'Warning'],
+        ['manual_review', 'Manual review'],
+        ['info', 'Info'],
+      ]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.textContent = label;
+        button.setAttribute('aria-pressed', 'true');
+        button.addEventListener('click', () => {
+          if (active.has(severity)) active.delete(severity);
+          else active.add(severity);
+          button.setAttribute('aria-pressed', active.has(severity) ? 'true' : 'false');
+          for (const card of cards) {
+            const severities = card.dataset.severities.split(' ').filter(Boolean);
+            card.hidden = severities.length > 0 && !severities.some((item) => active.has(item));
+          }
+        });
+        filters.append(button);
+      }
+      panel.append(filters);
     }
     panel.append(list);
     return panel;

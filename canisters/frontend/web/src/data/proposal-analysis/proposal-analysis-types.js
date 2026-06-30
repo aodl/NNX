@@ -100,6 +100,7 @@ export function createEmptyAnalysis({ proposalId = null, intent = null, lifecycl
       concentration: null,
       distance: null,
       dfinityProvider: null,
+      nodeHealth: null,
     },
     dataWarnings: [],
   };

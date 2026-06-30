@@ -143,6 +143,7 @@ test('node detail copy buttons use textContent and Globalping link is external m
   assert.match(panel.getTextContent(), /Copy domain/);
   const link = panel.querySelector('a');
   assert.equal(link.target, '_blank');
-  assert.equal(link.rel, 'noreferrer');
-  assert.match(link.textContent, /Globalping/);
+  assert.equal(link.rel, 'noopener noreferrer');
+  assert.match(link.textContent, /Manual external check/);
+  assert.match(link.textContent, /Not used by NNX validation/);
 }));
