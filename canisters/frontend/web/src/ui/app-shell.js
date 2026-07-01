@@ -18,55 +18,13 @@ function navKeyForRoute(route) {
 }
 
 function createLogo(documentRef) {
-  const wrap = documentRef.createElement('span');
-  wrap.className = 'nnx-logo-mark';
-  wrap.setAttribute('aria-hidden', 'true');
-  const svg = documentRef.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  svg.setAttribute('viewBox', '0 0 48 48');
-  svg.setAttribute('focusable', 'false');
-  const defs = documentRef.createElementNS(svg.namespaceURI, 'defs');
-  const gradient = documentRef.createElementNS(svg.namespaceURI, 'linearGradient');
-  gradient.setAttribute('id', 'nnxLogoGradient');
-  gradient.setAttribute('x1', '8');
-  gradient.setAttribute('x2', '40');
-  gradient.setAttribute('y1', '8');
-  gradient.setAttribute('y2', '40');
-  for (const [offset, color] of [['0%', '#18d7d1'], ['52%', '#8b5cf6'], ['100%', '#f97316']]) {
-    const stop = documentRef.createElementNS(svg.namespaceURI, 'stop');
-    stop.setAttribute('offset', offset);
-    stop.setAttribute('stop-color', color);
-    gradient.append(stop);
-  }
-  defs.append(gradient);
-  const ring = documentRef.createElementNS(svg.namespaceURI, 'path');
-  ring.setAttribute('d', 'M24 4 42 14v20L24 44 6 34V14L24 4Z');
-  ring.setAttribute('fill', 'none');
-  ring.setAttribute('stroke', 'url(#nnxLogoGradient)');
-  ring.setAttribute('stroke-width', '3');
-  const nodeA = documentRef.createElementNS(svg.namespaceURI, 'circle');
-  nodeA.setAttribute('cx', '16');
-  nodeA.setAttribute('cy', '18');
-  nodeA.setAttribute('r', '4');
-  const nodeB = documentRef.createElementNS(svg.namespaceURI, 'circle');
-  nodeB.setAttribute('cx', '31');
-  nodeB.setAttribute('cy', '16');
-  nodeB.setAttribute('r', '4');
-  const nodeC = documentRef.createElementNS(svg.namespaceURI, 'circle');
-  nodeC.setAttribute('cx', '27');
-  nodeC.setAttribute('cy', '31');
-  nodeC.setAttribute('r', '4');
-  const link = documentRef.createElementNS(svg.namespaceURI, 'path');
-  link.setAttribute('d', 'M19.5 17.6 27.5 16.4M29.8 19.6 27.9 27.2M18.6 21.2 24.4 28.1');
-  link.setAttribute('fill', 'none');
-  link.setAttribute('stroke', 'currentColor');
-  link.setAttribute('stroke-width', '2.5');
-  link.setAttribute('stroke-linecap', 'round');
-  for (const node of [nodeA, nodeB, nodeC]) {
-    node.setAttribute('fill', 'currentColor');
-  }
-  svg.append(defs, ring, link, nodeA, nodeB, nodeC);
-  wrap.append(svg);
-  return wrap;
+  const logo = documentRef.createElement('img');
+  logo.className = 'nnx-logo-mark';
+  logo.src = '/logo.svg';
+  logo.alt = 'Network Nexus logo';
+  logo.width = 42;
+  logo.height = 42;
+  return logo;
 }
 
 function createSearch(documentRef, windowRef) {
