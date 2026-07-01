@@ -6,9 +6,9 @@ Before each deployment:
 git diff --check
 npm ci --no-fund --no-audit
 npm run test:frontend-unit
+npm run build:frontend
 cargo fmt --all -- --check
 cargo test --workspace
-npm run build:frontend
 cargo build --workspace --target wasm32-unknown-unknown --release
 node tools/scripts/check-frontend-artifacts.mjs
 node tools/scripts/check-boundaries.mjs
@@ -30,7 +30,7 @@ not support the experimental management-canister method:
 
 ```sh
 npm run smoke:historian-node-metrics -- --network local --subnet-id <subnet-principal>
-npm run smoke:historian-node-metrics -- --network ic --subnet-id <subnet-principal>
+NNX_HISTORIAN_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai npm run smoke:historian-node-metrics -- --network ic
 ```
 
 Certified API-boundary membership smoke uses only certified subnet state for

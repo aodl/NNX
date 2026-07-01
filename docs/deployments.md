@@ -14,7 +14,7 @@ Permanent IC staging canisters:
 | frontend | `nnx_frontend_staging` | `6h2pa-qiaaa-aaaao-qp4fa-cai` | `https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/` |
 | historian | `nnx_historian_staging` | `yo47z-piaaa-aaaac-qg3xa-cai` | n/a |
 
-Codex may upgrade these staging canisters with `dfx` using the `codex-local`
+Codex may upgrade these staging canisters with `dfx` using the `codex_local`
 identity, following `docs/staging-deploy.md`.
 
 ## Production

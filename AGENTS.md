@@ -16,10 +16,10 @@ Update AGENTS.md for:
 - recurring user corrections
 - architecture invariants
 - deployment authority or canister IDs
-- required test/check commands
-- forbidden data sources, tools, or dependencies
+- required checks
+- forbidden data sources
 - repo-wide naming decisions
-- repeated pitfalls or bug classes
+- recurring bug classes
 - staging or production workflow changes
 
 Do not add:
@@ -28,10 +28,9 @@ Do not add:
 - one-off local paths or transient command failures
 - long chat transcripts
 - proposal-specific observations unless they reveal a reusable analyzer rule
-- large design details better suited to docs/
 
-Prefer editing existing sections over appending. Keep this file concise, move
-long procedures into docs/, and remove stale instructions when replacing them.
+Periodically consolidate this file. Prefer replacing stale sections over
+appending. Move detailed procedures into docs/ and link to them.
 
 ## Project summary
 
@@ -39,12 +38,12 @@ NNX is an Internet Computer / NNS governance dashboard.
 
 Architecture:
 
-- Rust certified asset frontend canister.
+- Rust certified frontend canister.
 - Plain browser JavaScript.
 - `icp-cli` / `icp.yaml` as committed project config.
 - Query-facade boundary for all onchain/system reads.
-- No React, TypeScript, Vite, Svelte, Next, DOM emulator, or automated
-  browser-test stack.
+- No React, TypeScript, Vite, Svelte, Next, Playwright, Puppeteer, Cypress,
+  jsdom, or browser automation.
 - No `dfx.json` in source control.
 
 Current routes:
@@ -65,10 +64,8 @@ browser agent code, fetch and follow the current Internet Computer skills index:
 - `nnx_frontend` is a certified static asset canister only.
 - `nnx_frontend` must not contain NNX app data APIs, management-canister proxy
   APIs, timers, durable NNX state, or historian state.
-- `nnx_historian` is the separate staging canister for
-  `node_metrics_history` access and future bounded historical sampling.
-- `nnx_historian` is the repo-facing canister/package name for bounded
-  `node_metrics_history` access and future bounded historical sampling.
+- `nnx_historian` is the separate canister for `node_metrics_history` access
+  and future bounded historical sampling.
 - UI/domain modules consume normalized query-facade/service objects only.
 - UI/domain modules must not import actors, agents, generated Candid
   declarations, raw Registry keys, protobuf decode internals, Principal
@@ -125,9 +122,10 @@ Proposal analysis must be lifecycle-aware. `ProposalStatus` wins over
 - executed + accepting-votes => `post_execution_success`
 - failed + accepting-votes => `post_execution_failed`
 - rejected + accepting-votes => `rejected`
+- adopted + accepting-votes => `pending_execution` or equivalent
 - open + accepting-votes => `pre_execution`
 
-Reward status accepting-votes is about rewards/voting reward settlement and must
+Reward status accepting-votes is about reward/vote settlement and must
 not override proposal execution status.
 
 Unsupported/unknown proposal actions must not throw. They should produce compact
@@ -155,7 +153,7 @@ Do not infer DFINITY control from display names.
 - `canisters/frontend/public/generated/*` should remain ignored except
   `.gitkeep`.
 - `frontend-env.json` and `build-info.json` are generated artifacts and should
-  not be committed unless explicitly designed otherwise.
+  not be committed.
 - The Rust frontend canister stamps the generated bundle path at
   asset-collection time.
 - The frontend build must not mutate tracked `index.html`.
@@ -193,10 +191,10 @@ npm run smoke:proposal-analysis:mainnet
 npm run smoke:api-boundary-membership -- --network ic --node-id 2vxsx-fae --expect-non-member 2vxsx-fae
 ```
 
-Historian/node metrics smoke when configured:
+Historian/node metrics smoke when network is available:
 
 ```sh
-npm run smoke:historian-node-metrics -- --network ic --subnet-id <real-subnet-id>
+NNX_HISTORIAN_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai npm run smoke:historian-node-metrics -- --network ic
 ```
 
 There is intentionally no automated browser-test dependency. Browser behavior is
@@ -215,7 +213,7 @@ tool.
 Use dfx identity:
 
 ```text
-codex-local
+codex_local
 ```
 
 Rules:
@@ -223,14 +221,16 @@ Rules:
 - Use `dfx` only for staging upgrades.
 - Do not deploy production.
 - Do not create new canisters.
-- Do not delete, stop, or reinstall canisters unless explicitly instructed.
+- Do not delete canisters.
+- Do not stop canisters unless explicitly instructed.
+- Do not reinstall/wipe canisters unless explicitly instructed.
 - Use upgrade mode for existing installed canisters.
 - Never use reinstall unless explicitly instructed.
 - Do not commit `dfx.json`.
 - Do not commit `.dfx/`, `canister_ids.json`, generated declarations,
   identities, PEMs, or local deployment state.
 - If `dfx` requires temporary config, create it outside the repo, for example
-  under `/tmp`, and remove it after use.
+  under `/tmp`, and delete it afterwards.
 
 The committed project remains `icp-cli`/`icp.yaml` based even though staging
 upgrades may use `dfx` operationally.
@@ -249,14 +249,14 @@ Codex may autonomously perform this staging loop:
 
 1. Run deployed-mainnet review against staging.
 2. Detect misleading analysis, unnecessary warnings, unsupported-but-important
-   proposal actions, or missing evidence.
+   proposal actions, missing evidence, or bug-suspected classifications.
 3. Capture fixtures for suspicious proposals.
 4. Add failing tests.
 5. Fix parser/analyzer/UI copy/data handling.
 6. Run full checks.
 7. Commit the fix.
 8. Build from the clean commit.
-9. Deploy to staging with `dfx` using `codex-local`.
+9. Deploy to staging with `dfx` using the authorized identity.
 10. Verify build-info and frontend-env.
 11. Rerun smokes/review.
 12. Report results.
@@ -280,7 +280,7 @@ evidence.
 
 If you find a bug or misleading analysis, capture a fixture, add a failing test,
 fix it, run the full checks, commit, deploy to the staging canisters with `dfx`
-using `codex-local`, and report. Do not deploy production.
+using the authorized identity, and report. Do not deploy production.
 
 ## Useful docs
 

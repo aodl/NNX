@@ -1,11 +1,7 @@
 # Historian Canister
 
-The historian currently exists in staging as a bounded
-`node_metrics_history` access canister. It does not yet persist durable
-historical records. Any future sampling/storage must be bounded, paged,
-provenance-rich, and tested.
-
-The historian is implemented today as a bounded `node_metrics_history` proxy. It
+The historian is a separate canister for bounded `node_metrics_history` access
+and future bounded historical sampling. It
 does not yet persist durable historical records. Future periodic sampling must
 be bounded, paged, provenance-rich, and tested before being enabled.
 

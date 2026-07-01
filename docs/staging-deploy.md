@@ -7,10 +7,10 @@ to the permanent staging canisters:
 - frontend: `6h2pa-qiaaa-aaaao-qp4fa-cai`
 - historian: `yo47z-piaaa-aaaac-qg3xa-cai`
 
-Use the `codex-local` identity:
+Use the `codex_local` identity:
 
 ```sh
-dfx identity use codex-local
+dfx identity use codex_local
 dfx identity whoami
 dfx identity get-principal
 ```
@@ -40,7 +40,7 @@ ICP_WASM_OUTPUT_PATH=/tmp/nnx_historian_staging.wasm \
 ```
 
 If `dfx` requires canister names, create temporary config outside the repo, for
-example under `/tmp`, and remove it after use. Never commit `dfx.json`, `.dfx/`,
+example under `/tmp`, and delete it afterwards. Never commit `dfx.json`, `.dfx/`,
 `canister_ids.json`, generated declarations, identities, PEMs, or local
 deployment state.
 
@@ -82,6 +82,8 @@ Rules:
 
 - Do not create new canisters.
 - Do not deploy production.
-- Do not stop, delete, or reinstall canisters unless explicitly instructed.
+- Do not delete canisters.
+- Do not stop canisters unless explicitly instructed.
+- Do not reinstall/wipe canisters unless explicitly instructed.
 - Use upgrade mode for existing installed canisters.
 - Commit before staging deployment when build-info includes `gitCommit`.

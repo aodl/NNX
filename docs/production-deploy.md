@@ -2,6 +2,9 @@
 
 Production canisters are placeholders for now.
 
+The committed project config remains `icp-cli`/`icp.yaml`; production
+deployment docs must not introduce a committed `dfx.json`.
+
 Codex must not deploy production without explicit human approval in the current
 task. Codex may prepare production checklists or commands, but must not execute a
 production deployment autonomously.

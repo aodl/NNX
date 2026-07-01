@@ -173,11 +173,13 @@ Additional checks:
 ```sh
 npm ci --no-fund --no-audit
 npm run test:frontend-unit
+npm run build:frontend
 cargo fmt --all -- --check
 cargo test --workspace
-npm run build:frontend
+cargo build --workspace --target wasm32-unknown-unknown --release
 node tools/scripts/check-frontend-artifacts.mjs
 node tools/scripts/check-boundaries.mjs
+tools/scripts/security-scan
 ```
 
 Security scans:
