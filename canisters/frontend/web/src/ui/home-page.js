@@ -20,13 +20,23 @@ function renderHeader() {
   const header = document.createElement('header');
   header.className = 'home-header';
 
+  const logo = document.createElement('img');
+  logo.className = 'home-logo';
+  logo.src = '/logo.svg';
+  logo.alt = 'Network Nexus logo';
+  logo.width = 96;
+  logo.height = 96;
+
+  const copy = document.createElement('div');
+  copy.className = 'home-header-copy';
   const title = document.createElement('h1');
   title.textContent = 'NETWORK NEXUS';
   const subtitle = document.createElement('p');
   subtitle.className = 'subtitle';
   subtitle.textContent = 'Optimizing NNS governance and tokenomics';
+  copy.append(title, subtitle);
 
-  header.append(title, subtitle);
+  header.append(logo, copy);
   return header;
 }
 

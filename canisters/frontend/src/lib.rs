@@ -206,6 +206,14 @@ fn certify_all_assets() {
             encodings: vec![AssetEncoding::Gzip.default_config()],
         },
         AssetConfig::File {
+            path: "logo.svg".to_string(),
+            content_type: Some("image/svg+xml".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
+        AssetConfig::File {
             path: "map/ne_110m_land.geojson".to_string(),
             content_type: Some("application/geo+json".to_string()),
             headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
@@ -285,6 +293,9 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     let base_css = dir
         .get_file("base.css")
         .ok_or_else(|| "base.css is missing from frontend assets".to_string())?;
+    let logo_svg = dir
+        .get_file("logo.svg")
+        .ok_or_else(|| "logo.svg is missing from frontend assets".to_string())?;
     let land_geojson = dir
         .get_file("map/ne_110m_land.geojson")
         .ok_or_else(|| "map/ne_110m_land.geojson is missing from frontend assets".to_string())?;
@@ -340,6 +351,13 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
         "/base.css",
         StatusCode::OK,
         headers_for_path("base.css", base_css.contents().len()),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/logo.svg",
+        StatusCode::OK,
+        headers_for_path("logo.svg", logo_svg.contents().len()),
         HeadAssetMatchKind::Exact,
     )?;
     insert_head_asset(
@@ -607,7 +625,7 @@ fn is_public_route(path: &str) -> bool {
     if path == "/" || path == "/missing" || path == "/review" || path == "/data-sources" {
         return true;
     }
-    if path == "/base.css" || path == "/404" || path == "/404.html" {
+    if path == "/base.css" || path == "/logo.svg" || path == "/404" || path == "/404.html" {
         return true;
     }
     if path == "/map/ne_110m_land.geojson" {
@@ -769,6 +787,7 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
         if path == "index.html"
             || path == "404.html"
             || path == "base.css"
+            || path == "logo.svg"
             || path == ".well-known/ic-domains"
             || path == "map/ne_110m_land.geojson"
             || path == PUBLIC_FRONTEND_ENV_PATH
@@ -784,6 +803,7 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
         "content-type".to_string(),
         match path {
             "index.html" | "404.html" => "text/html",
+            "logo.svg" => "image/svg+xml",
             ".well-known/ic-domains" => "text/plain",
             "map/ne_110m_land.geojson" => "application/geo+json",
             "generated/frontend-env.json" | "generated/build-info.json" => "application/json",
@@ -1170,6 +1190,21 @@ mod tests {
             header_value(&response, "cache-control"),
             Some(NO_CACHE_ASSET_CACHE_CONTROL)
         );
+    }
+
+    #[test]
+    fn logo_svg_asset_is_served_with_no_cache_headers() {
+        let response = get("/logo.svg");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("image/svg+xml")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus logo"));
     }
 
     #[test]

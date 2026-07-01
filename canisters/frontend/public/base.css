@@ -52,8 +52,21 @@ a {
 }
 
 .home-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
   padding-bottom: 18px;
   border-bottom: 1px solid var(--line);
+}
+
+.home-logo {
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+}
+
+.home-header-copy {
+  min-width: 0;
 }
 
 .brand,
