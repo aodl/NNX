@@ -17,8 +17,53 @@ export function groupProposalsByTopic(proposals) {
   return groups;
 }
 
+const PROPOSAL_STATUS_DISPLAY_ORDER = [
+  ['open', 'Open'],
+  ['adopted', 'Adopted'],
+  ['executed', 'Executed'],
+  ['failed', 'Failed'],
+  ['rejected', 'Rejected'],
+  ['unknown', 'Unknown'],
+];
+
+function proposalStatusKey(proposal) {
+  return proposal.statusKind ?? 'unknown';
+}
+
+function proposalStatusLabel(proposal, key) {
+  return proposal.statusLabel ?? PROPOSAL_STATUS_DISPLAY_ORDER.find(([kind]) => kind === key)?.[1] ?? 'Unknown';
+}
+
+export function groupProposalsByStatus(proposals) {
+  const byStatus = new Map();
+  for (const proposal of proposals) {
+    const key = proposalStatusKey(proposal);
+    let group = byStatus.get(key);
+    if (!group) {
+      group = {
+        statusKind: key,
+        statusLabel: proposalStatusLabel(proposal, key),
+        proposals: [],
+      };
+      byStatus.set(key, group);
+    }
+    group.proposals.push(proposal);
+  }
+
+  const ordered = [];
+  for (const [kind, fallbackLabel] of PROPOSAL_STATUS_DISPLAY_ORDER) {
+    const group = byStatus.get(kind);
+    if (group) {
+      ordered.push({ ...group, statusLabel: group.statusLabel ?? fallbackLabel });
+      byStatus.delete(kind);
+    }
+  }
+  ordered.push(...byStatus.values());
+  return ordered;
+}
+
 export function summarizeProposalStatuses(proposals) {
-  const counts = { open: 0, executed: 0, failed: 0 };
+  const counts = Object.fromEntries(PROPOSAL_STATUS_DISPLAY_ORDER.map(([kind]) => [kind, 0]));
   for (const proposal of proposals) {
     if (proposal.statusKind in counts) {
       counts[proposal.statusKind] += 1;
@@ -29,11 +74,7 @@ export function summarizeProposalStatuses(proposals) {
 
 function renderStatusSummary(proposals) {
   const counts = summarizeProposalStatuses(proposals);
-  const items = [
-    ['open', 'Open'],
-    ['executed', 'Executed'],
-    ['failed', 'Failed'],
-  ].filter(([kind]) => counts[kind] > 0);
+  const items = PROPOSAL_STATUS_DISPLAY_ORDER.filter(([kind]) => counts[kind] > 0);
 
   const summary = document.createElement('span');
   summary.className = 'proposal-group-statuses';
@@ -54,7 +95,7 @@ function setGroupExpanded(section, expanded) {
   if (list) list.setAttribute('aria-hidden', expanded ? 'false' : 'true');
 }
 
-function renderProposalGroup(group, expanded = false) {
+function renderProposalGroup(group, { expanded = false, showStatusSummary = true } = {}) {
   const section = document.createElement('section');
   section.className = 'proposal-group';
   section.classList.toggle('expanded', expanded);
@@ -76,7 +117,8 @@ function renderProposalGroup(group, expanded = false) {
   chevron.className = 'proposal-group-chevron';
   chevron.setAttribute('aria-hidden', 'true');
   chevron.textContent = '›';
-  meta.append(renderStatusSummary(group.proposals), count, chevron);
+  if (showStatusSummary) meta.append(renderStatusSummary(group.proposals));
+  meta.append(count, chevron);
   header.append(title, meta);
 
   const list = document.createElement('div');
@@ -87,6 +129,40 @@ function renderProposalGroup(group, expanded = false) {
   }
 
   section.append(header, list);
+  return section;
+}
+
+function renderStatusSection(statusGroup) {
+  const section = document.createElement('section');
+  section.className = `proposal-status-section ${statusGroup.statusKind}`;
+
+  const header = document.createElement('div');
+  header.className = 'proposal-status-section-header';
+  const title = document.createElement('h3');
+  title.className = 'proposal-status-section-title';
+  title.textContent = statusGroup.statusLabel;
+  const count = document.createElement('span');
+  count.className = `proposal-group-status ${statusGroup.statusKind}`;
+  count.textContent = `${statusGroup.proposals.length} proposal${statusGroup.proposals.length === 1 ? '' : 's'}`;
+  header.append(title, count);
+  section.append(header);
+
+  const groupsElement = document.createElement('div');
+  groupsElement.className = 'proposal-groups proposal-topic-subgroups';
+  const groupedProposals = groupProposalsByTopic(statusGroup.proposals);
+  groupedProposals.forEach((group) => {
+    const groupElement = renderProposalGroup(group, { showStatusSummary: false });
+    const toggle = groupElement.querySelector('.proposal-group-toggle');
+    toggle?.addEventListener('click', () => {
+      const shouldExpand = toggle.getAttribute('aria-expanded') !== 'true';
+      for (const nestedSection of groupsElement.querySelectorAll('.proposal-group')) {
+        setGroupExpanded(nestedSection, false);
+      }
+      setGroupExpanded(groupElement, shouldExpand);
+    });
+    groupsElement.append(groupElement);
+  });
+  section.append(groupsElement);
   return section;
 }
 
@@ -184,19 +260,10 @@ export function renderProposalPanel({
   }
 
   const groupsElement = document.createElement('div');
-  groupsElement.className = 'proposal-groups';
-  const groupedProposals = groupProposalsByTopic(proposals);
+  groupsElement.className = 'proposal-status-sections';
+  const groupedProposals = groupProposalsByStatus(proposals);
   groupedProposals.forEach((group) => {
-    const groupElement = renderProposalGroup(group);
-    const toggle = groupElement.querySelector('.proposal-group-toggle');
-    toggle?.addEventListener('click', () => {
-      const shouldExpand = toggle.getAttribute('aria-expanded') !== 'true';
-      for (const section of groupsElement.querySelectorAll('.proposal-group')) {
-        setGroupExpanded(section, false);
-      }
-      setGroupExpanded(groupElement, shouldExpand);
-    });
-    groupsElement.append(groupElement);
+    groupsElement.append(renderStatusSection(group));
   });
   panel.append(groupsElement);
   return panel;

@@ -15,6 +15,7 @@ import {
   summarizeSubnetKinds,
 } from '../src/ui/home-page.js';
 import {
+  groupProposalsByStatus,
   groupProposalsByTopic,
   summarizeProposalStatuses,
 } from '../src/ui/proposal-list-panel.js';
@@ -62,6 +63,26 @@ test('groups proposals by topic in current order', () => {
   assert.deepEqual(groups[0].proposals.map((proposal) => proposal.id), [1n, 3n]);
 });
 
+test('groups proposals by execution state before topic subgrouping', () => {
+  const groups = groupProposalsByStatus([
+    { id: 1n, statusKind: 'executed', statusLabel: 'Executed', topicLabel: 'Governance' },
+    { id: 2n, statusKind: 'open', statusLabel: 'Open', topicLabel: 'Node Admin' },
+    { id: 3n, statusKind: 'failed', statusLabel: 'Failed', topicLabel: 'Governance' },
+    { id: 4n, statusKind: 'executed', statusLabel: 'Executed', topicLabel: 'Node Admin' },
+  ]);
+
+  assert.deepEqual(groups.map((group) => group.statusLabel), ['Open', 'Executed', 'Failed']);
+  assert.deepEqual(groups.map((group) => group.proposals.map((proposal) => proposal.id)), [
+    [2n],
+    [1n, 4n],
+    [3n],
+  ]);
+  assert.deepEqual(
+    groupProposalsByTopic(groups[1].proposals).map((group) => group.topicLabel),
+    ['Governance', 'Node Admin'],
+  );
+});
+
 test('summarizes proposal statuses for group headers', () => {
   const counts = summarizeProposalStatuses([
     { statusKind: 'open' },
@@ -71,7 +92,14 @@ test('summarizes proposal statuses for group headers', () => {
     { statusKind: 'adopted' },
   ]);
 
-  assert.deepEqual(counts, { open: 2, executed: 1, failed: 1 });
+  assert.deepEqual(counts, {
+    open: 2,
+    adopted: 1,
+    executed: 1,
+    failed: 1,
+    rejected: 0,
+    unknown: 0,
+  });
 });
 
 test('summarizes subnet kinds for group headers', () => {

@@ -200,6 +200,40 @@ h2 {
   margin-top: 12px;
 }
 
+.proposal-status-sections {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.proposal-status-section {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.proposal-status-section + .proposal-status-section {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.proposal-status-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.proposal-status-section-title {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.2;
+}
+
+.proposal-topic-subgroups {
+  margin-top: 0;
+}
+
 .subnet-groups {
   display: grid;
   gap: 8px;
@@ -371,6 +405,24 @@ h2 {
   border-color: #fecaca;
   background: #fef2f2;
   color: #b91c1c;
+}
+
+.proposal-group-status.adopted {
+  border-color: #fde68a;
+  background: #fffbeb;
+  color: #a16207;
+}
+
+.proposal-group-status.rejected {
+  border-color: #fed7aa;
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.proposal-group-status.unknown {
+  border-color: #d1d5db;
+  background: #f9fafb;
+  color: #4b5563;
 }
 
 .subnet-group-summary.proposal-group-statuses {
