@@ -32,6 +32,10 @@ class TestElement {
     this.listeners[name] = fn;
   }
 
+  click() {
+    this.listeners.click?.();
+  }
+
   querySelector(selector) {
     return this.querySelectorAll(selector)[0] ?? null;
   }
@@ -126,6 +130,16 @@ test('proposal detail renders grouped issues', () => withDocument(() => {
 }));
 
 test('node detail copy buttons use textContent and Globalping link is external manual', () => withDocument(() => {
+  const originalNavigator = globalThis.navigator;
+  const copiedValues = [];
+  Object.defineProperty(globalThis, 'navigator', {
+    configurable: true,
+    value: {
+      clipboard: {
+        writeText: (value) => copiedValues.push(value),
+      },
+    },
+  });
   const panel = renderAnalysisNodeDetails({
     nodeId: 'node-1',
     currentSubnetId: 'subnet-1',
@@ -134,19 +148,58 @@ test('node detail copy buttons use textContent and Globalping link is external m
     dataCenterId: 'dc-1',
     dataCenterOwner: 'owner',
     dataCenterRegion: 'region',
+    normalizedCountryName: 'United States',
+    normalizedContinent: 'North America',
     gps: { latitude: 1, longitude: 2 },
     publicIpv4: { ipAddr: '203.0.113.10' },
     publicIpv6: { ipAddr: '2001:db8::10' },
     domain: 'node.example.com',
-    httpEndpoint: '2001:db8::1:8080',
+    httpEndpoint: 'https://node.example.com:8080',
+    xnetEndpoint: '203.0.113.10:2497',
   });
-  assert.match(panel.getTextContent(), /Copy IPv4/);
-  assert.match(panel.getTextContent(), /Copy IPv6/);
-  assert.match(panel.getTextContent(), /2001:db8::10/);
-  assert.match(panel.getTextContent(), /Copy domain/);
-  const link = panel.querySelector('a');
-  assert.equal(link.target, '_blank');
-  assert.equal(link.rel, 'noopener noreferrer');
-  assert.match(link.textContent, /Manual external check/);
-  assert.match(link.textContent, /Not used by NNX validation/);
+  try {
+    const text = panel.getTextContent();
+    for (const expected of [
+      'node-1',
+      'provider-1',
+      'operator-1',
+      'dc-1',
+      'owner',
+      'region',
+      'United States',
+      'North America',
+      '1, 2',
+      '203.0.113.10',
+      '2001:db8::10',
+      'node.example.com',
+      'https://node.example.com:8080',
+      '203.0.113.10:2497',
+      'Copy IPv4',
+      'Copy IPv6',
+      'Copy endpoint',
+      'Copy domain',
+    ]) {
+      assert.match(text, new RegExp(expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    }
+
+    const buttons = panel.querySelectorAll('button');
+    for (const button of buttons) button.click();
+    assert.deepEqual(copiedValues, [
+      '203.0.113.10',
+      '2001:db8::10',
+      'https://node.example.com:8080',
+      'node.example.com',
+    ]);
+
+    const link = panel.querySelector('a');
+    assert.equal(link.target, '_blank');
+    assert.equal(link.rel, 'noopener noreferrer');
+    assert.match(link.textContent, /Manual external check/);
+    assert.match(link.textContent, /Not used by NNX validation/);
+  } finally {
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: originalNavigator,
+    });
+  }
 }));

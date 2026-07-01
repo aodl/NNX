@@ -1,32 +1,27 @@
-# Browser Smoke Harness
+# Manual Browser Smoke
 
-NNX browser smoke tests live in `tests/e2e/` and run with Playwright:
+Manual browser smoke, for release operators:
 
-```sh
-npm run test:e2e
-npm run smoke:browser:local
-```
+1. Deploy or serve the built frontend through the normal certified-asset canister path.
+2. Open `/`.
+3. Confirm open proposal cards render.
+4. Confirm proposal-analysis badges appear where expected.
+5. Open `/proposal/{real proposal id}`.
+6. Confirm the proposal detail and proposal-analysis panel render.
+7. Confirm lifecycle mode, severity groups, and evidence sections render where relevant.
+8. Open `/subnet/{real subnet principal}`.
+9. Confirm subnet detail page renders.
+10. Confirm map/globe area renders or degrades gracefully.
+11. Confirm node list/details work.
+12. Confirm the Globalping link says "Manual external check - Not used by NNX validation."
+13. Open `/neuron/{real neuron id}`.
+14. Confirm neuron page and vote-guarantee wording render.
+15. Check malformed routes:
+    - `/subnet/not-a-principal` -> 404
+    - `/subnet/{valid}/extra` -> 404
+    - `/proposal/not-a-number` -> 404
+    - `/neuron/not-a-number` -> 404
+16. Check the browser console manually for unexpected errors.
 
-The harness builds the static frontend, serves `canisters/frontend/public`, and
-stamps the generated bundle path into `index.html` in the same shape expected
-from the certified asset canister.
-
-Playwright injects `window.__NNX_TEST_QUERY_FACADE__` before application
-bootstrap. This is a test-only normalized query facade so browser tests can run
-without mainnet, a local replica, private credentials, dashboard APIs, or
-offchain inventories.
-
-Production pages do not define `window.__NNX_TEST_QUERY_FACADE__`; they create
-the normal IC query backend and consume data through `queryFacade`. The hook does
-not expose secrets, does not bypass safe URL rendering or DOM text insertion, and
-must not be used as a production data source.
-
-Minimal containers may not include Chromium system libraries. In a browser-ready
-environment, install them with:
-
-```sh
-npx playwright install --with-deps chromium
-```
-
-If Chromium fails with `libatk-1.0.so.0: cannot open shared object file`, run the
-same command in an environment where Playwright may install OS dependencies.
+This is a manual release check only. It does not provide validation data to NNX,
+and Globalping remains a reviewer aid only.

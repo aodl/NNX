@@ -13,16 +13,13 @@ cargo build --workspace --target wasm32-unknown-unknown --release
 node tools/scripts/check-frontend-artifacts.mjs
 node tools/scripts/check-boundaries.mjs
 tools/scripts/security-scan
-npm run test:e2e
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_test.wasm ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
 ```
 
-`npm run test:e2e` uses Playwright Chromium and requires the browser system
-libraries documented by Playwright for the host OS. In minimal containers, run it
-in a browser-capable image or install the missing libraries first. See
-`docs/testing/browser-smoke.md` for the fixture harness and test-only query
-facade notes.
+Browser smoke is a manual release checklist item only. See
+`docs/testing/browser-smoke.md`; it does not require npm browser automation
+dependencies or host OS browser packages.
 
 The node metrics proxy valid-path smoke is manual because local replicas may not
 support the experimental management-canister method:
@@ -48,7 +45,7 @@ Verify:
 - `canisters/frontend/public/index.html` still references `/generated/app.placeholder.js`
 - no generated `app.<hash>.js` bundle is staged
 - generated bundles remain ignored except `.gitkeep`
-- route smoke and mainnet query smoke pass
+- route unit tests and mainnet query smoke pass
 - node metrics valid-path smoke returns normalized records, empty records, or
   typed `MANAGEMENT_CANISTER_CALL_FAILED`; it must not trap or return
   `MANAGEMENT_CANISTER_DECODE_FAILED`
@@ -56,7 +53,7 @@ Verify:
   separate check from the valid management-call path smoke
 - API-boundary membership smoke prints `available`, returned member node IDs,
   warnings, and errors; unavailable mainnet certified-state reads are failures
-- manual browser smoke passes for WebGL/globe
+- manual browser smoke passes for map/globe behavior
 - `node tools/scripts/check-frontend-artifacts.mjs`
 - `node tools/scripts/check-boundaries.mjs`
 - `tools/scripts/security-scan`
@@ -66,22 +63,25 @@ Verify:
 
 Manual browser smoke:
 
-- `/`: open proposal cards render, analysis badges appear where expected,
-  unsupported-action cards are compact, and there are no console errors
-- `/proposal/{real proposal id}`: detail, proposal analysis, severity grouping,
-  lifecycle mode, state-change section, parser-confidence/manual-review UI, safe
-  external link behavior, and no console errors
-- `/subnet/{real subnet principal}`: subnet detail, globe/flat map, node list,
-  Registry metadata, manual Globalping label, proposed-node highlighting where
-  applicable, and no console errors
-- `/neuron/{real neuron id}`: neuron page works and vote-guarantee UI uses
-  generalized proof wording
-
-Malformed route checks:
-
-- `/subnet/not-a-principal` -> 404
-- `/subnet/{valid}/extra` -> 404
-- `/proposal/not-a-number` -> 404
-- `/neuron/not-a-number` -> 404
+1. Deploy or serve the built frontend through the normal certified-asset canister path.
+2. Open `/`.
+3. Confirm open proposal cards render.
+4. Confirm proposal-analysis badges appear where expected.
+5. Open `/proposal/{real proposal id}`.
+6. Confirm the proposal detail and proposal-analysis panel render.
+7. Confirm lifecycle mode, severity groups, and evidence sections render where relevant.
+8. Open `/subnet/{real subnet principal}`.
+9. Confirm subnet detail page renders.
+10. Confirm map/globe area renders or degrades gracefully.
+11. Confirm node list/details work.
+12. Confirm Globalping link says "Manual external check - Not used by NNX validation."
+13. Open `/neuron/{real neuron id}`.
+14. Confirm neuron page and vote-guarantee wording render.
+15. Check malformed routes:
+    - `/subnet/not-a-principal` -> 404
+    - `/subnet/{valid}/extra` -> 404
+    - `/proposal/not-a-number` -> 404
+    - `/neuron/not-a-number` -> 404
+16. Check browser console manually for unexpected errors.
 
 Deploy with the repo's `icp-cli` flow. Do not add `dfx.json` or switch to `dfx`.

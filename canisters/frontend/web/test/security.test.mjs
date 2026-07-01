@@ -17,6 +17,8 @@ test('safeExternalUrl rejects unsafe or malformed URLs', () => {
     'file:///tmp/a',
     'http://example.com',
     'https://example.com/\nnext',
+    'https://example.com/\u0000next',
+    'https://example.com/\u001fnext',
     'not a url',
   ]) {
     assert.equal(safeExternalUrl(value), null, value);
