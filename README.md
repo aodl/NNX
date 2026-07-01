@@ -1,6 +1,8 @@
-# Network Nexus (NNX)
+![NNX](https://github.com/aodl/NNX/blob/master/canisters/frontend/public/logo.svg)
 
-Network Nexus is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
+# **N E T W O R K _ N E X U S**
+
+Network Nexus (NNX) is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
 The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, `/subnet/{subnet_id}` shows Registry-derived subnet details and node locations, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
 
