@@ -1,0 +1,40 @@
+{
+  "capturedAt": "2026-07-01T20:57:57.039Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142653",
+  "topicId": 12,
+  "topicLabel": "IC OS Version Deployment",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 1,
+  "rewardStatusKind": "accepting-votes",
+  "rewardStatusLabel": "Accepting votes",
+  "actionTypeName": "Deploy GuestOS To All Subnet Nodes",
+  "actionDescription": "Deploy a GuestOS version to a given subnet. The proposal changes the GuestOS version that is used on the specified subnet.\n\nThe version must be contained in the list of elected GuestOS versions.\n\nThe upgrade is completed when the subnet creates the next regular CUP.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "replica_version_id",
+      "value": "feb8e5f205ad5577b2e11e56a6f94faa2d1c6116"
+    },
+    {
+      "name": "subnet_id",
+      "value": "kp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nDeploy a GuestOS version to a given subnet. The proposal changes the GuestOS version that is used on the specified subnet.\n\nThe version must be contained in the list of elected GuestOS versions.\n\nThe upgrade is completed when the subnet creates the next regular CUP.\ntype_name\nDeploy GuestOS To All Subnet Nodes\nvalue\nMap\nreplica_version_id\nText\nfeb8e5f205ad5577b2e11e56a6f94faa2d1c6116\nsubnet_id\nText\nkp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae",
+  "parsedIntent": {
+    "actionKind": "Unsupported",
+    "confidence": "unsupported",
+    "targetSubnetId": "kp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae",
+    "referencedSubnetIds": [
+      "kp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae"
+    ],
+    "addNodeIds": [],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

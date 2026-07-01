@@ -110,12 +110,17 @@ function classifyAddRemove(proposal, fallbackNodeIds = []) {
 export function parseProposalIntent(proposal) {
   const warnings = [];
   const proposalId = proposalIdValue(proposal);
-  const typeText = [
+  const primaryTypeText = [
     proposal?.actionKind,
     proposal?.actionTypeName,
+  ].filter(Boolean).join('\n');
+  const fallbackTypeText = [
     proposal?.actionDescription,
   ].filter(Boolean).join('\n');
-  const actionKind = normalizeActionKind(typeText || payloadText(proposal));
+  let actionKind = normalizeActionKind(primaryTypeText);
+  if (!primaryTypeText) {
+    actionKind = normalizeActionKind(fallbackTypeText || payloadText(proposal));
+  }
   const structuredPrincipals = nodeIdsFromStructuredValues(proposal);
   const fallbackPrincipals = principalsFromText(proposal?.payloadSearchText ?? '');
   const referencedSubnetIds = subnetIdsFromStructuredValues(proposal);

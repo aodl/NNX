@@ -60,6 +60,23 @@ test('Unsupported action returns Unsupported and does not throw', () => {
   assert.equal(intent.confidence, 'unsupported');
 });
 
+test('unsupported explicit action type is not reclassified from descriptive prose', () => {
+  const intent = parseProposalIntent({
+    id: 142653n,
+    actionTypeName: 'Deploy GuestOS To All Subnet Nodes',
+    actionDescription: 'Deploy a GuestOS version to a given subnet. The upgrade is completed when the subnet creates the next regular CUP.',
+    actionValues: [
+      { name: 'subnet_id', value: 'kp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae' },
+      { name: 'replica_version_id', value: 'feb8e5f205ad5577b2e11e56a6f94faa2d1c6116' },
+    ],
+  });
+  assert.equal(intent.actionKind, 'Unsupported');
+  assert.equal(intent.confidence, 'unsupported');
+  assert.equal(intent.createsNewSubnet, false);
+  assert.deepEqual(intent.addNodeIds, []);
+  assert.deepEqual(intent.referencedSubnetIds, ['kp5jj-kpgmn-f4ohx-uqot6-wtbbr-lmtqv-kpkaf-gcksv-snkwm-43kmy-iae']);
+});
+
 test('Fallback free-text parser has low confidence', () => {
   const intent = parseProposalIntent({
     actionDescription: 'Add nodes',
