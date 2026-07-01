@@ -59,10 +59,17 @@ function nodeRecordFixture(nodeOperatorId) {
   ]);
 }
 
-function getValueResponseFixture(value) {
+function getValueResponseFixture(value, version = 7) {
+  return concatBytes([
+    varintField(2, version),
+    bytesField(3, value),
+  ]);
+}
+
+function largeValueResponseFixture() {
   return concatBytes([
     varintField(2, 7),
-    bytesField(3, value),
+    bytesField(4, new TextEncoder().encode('chunk-key-1')),
   ]);
 }
 
@@ -83,6 +90,17 @@ test('decodes raw Registry get_value protobuf fixture', () => {
   assert.equal(response.version, 7n);
   assert.deepEqual(decodeSubnetListRecord(response.value), subnetIds);
   assert.equal(response.error, null);
+});
+
+test('decodes raw Registry get_value with future unknown protobuf fields', () => {
+  const subnetIds = [Principal.fromText('uuc56-gyb').toText()];
+  const response = decodeRegistryGetValueResponse(concatBytes([
+    getValueResponseFixture(subnetListFixture(subnetIds)),
+    bytesField(99, new TextEncoder().encode('future field')),
+  ]));
+
+  assert.equal(response.version, 7n);
+  assert.deepEqual(decodeSubnetListRecord(response.value), subnetIds);
 });
 
 test('decodes raw Registry node record protobuf fixture', () => {
@@ -165,7 +183,7 @@ test('raw Registry client calls get_value and returns node record', async () => 
   assert.ok(new TextDecoder().decode(queryCall.fields.arg).includes(`node_record_${nodeId}`));
 });
 
-test('raw Registry client surfaces get_value Registry errors', async () => {
+test('raw Registry client surfaces missing key Registry errors', async () => {
   const registryError = bytesField(1, concatBytes([
     varintField(1, 1),
     bytesField(2, new TextEncoder().encode('missing key')),
@@ -184,8 +202,88 @@ test('raw Registry client surfaces get_value Registry errors', async () => {
     () => client.listSubnetIds(),
     (error) => {
       assert.equal(error instanceof IcTopologyError, true);
-      assert.equal(error.code, TOPOLOGY_ERROR_CODES.REGISTRY_RESPONSE_ERR);
+      assert.equal(error.code, TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_UNAVAILABLE);
       return true;
     },
   );
+});
+
+test('raw Registry client surfaces get_value call failures', async () => {
+  const client = createRawRegistryClient({
+    registryCanisterId: 'rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    agent: {
+      query: async () => { throw new Error('query failed'); },
+    },
+  });
+
+  await assert.rejects(
+    () => client.listSubnetIds(),
+    (error) => {
+      assert.equal(error instanceof IcTopologyError, true);
+      assert.equal(error.code, TOPOLOGY_ERROR_CODES.REGISTRY_CALL_FAILED);
+      return true;
+    },
+  );
+});
+
+test('raw Registry client surfaces get_value decode errors', async () => {
+  const client = createRawRegistryClient({
+    registryCanisterId: 'rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    agent: {
+      query: async () => ({
+        status: 'replied',
+        reply: { arg: Uint8Array.from([0xff]) },
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => client.listSubnetIds(),
+    (error) => {
+      assert.equal(error instanceof IcTopologyError, true);
+      assert.equal(error.code, TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED);
+      return true;
+    },
+  );
+});
+
+test('raw Registry client surfaces chunked large value responses as unsupported', async () => {
+  const client = createRawRegistryClient({
+    registryCanisterId: 'rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    agent: {
+      query: async () => ({
+        status: 'replied',
+        reply: { arg: largeValueResponseFixture() },
+      }),
+    },
+  });
+
+  await assert.rejects(
+    () => client.listSubnetIds(),
+    (error) => {
+      assert.equal(error instanceof IcTopologyError, true);
+      assert.equal(error.code, TOPOLOGY_ERROR_CODES.REGISTRY_LARGE_VALUE_UNSUPPORTED);
+      return true;
+    },
+  );
+});
+
+test('raw Registry client returns versioned node records', async () => {
+  const nodeId = Principal.fromText('2vxsx-fae').toText();
+  const nodeOperatorId = Principal.fromText('uuc56-gyb').toText();
+  const client = createRawRegistryClient({
+    registryCanisterId: 'rwlgt-iiaaa-aaaaa-aaaaa-cai',
+    agent: {
+      query: async () => ({
+        status: 'replied',
+        reply: {
+          arg: getValueResponseFixture(nodeRecordFixture(nodeOperatorId), 99),
+        },
+      }),
+    },
+  });
+
+  const versioned = await client.getNodeRecordWithVersion(nodeId);
+  assert.equal(versioned.version, 99n);
+  assert.equal(versioned.nodeRecord.nodeId, nodeId);
 });

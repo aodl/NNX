@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "generate:nns-topics": "node tools/scripts/generate-nns-topics.mjs",
+    "update:governance-proto-cache": "node tools/scripts/update-governance-proto-cache.mjs",
     "build:frontend": "npm run generate:nns-topics && node canisters/frontend/web/build-frontend.mjs",
     "setup:frontend": "npm ci --no-fund --no-audit",
     "smoke:api-boundary-membership": "node tools/scripts/smoke-api-boundary-membership.mjs",

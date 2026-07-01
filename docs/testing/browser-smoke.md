@@ -27,3 +27,6 @@ environment, install them with:
 ```sh
 npx playwright install --with-deps chromium
 ```
+
+If Chromium fails with `libatk-1.0.so.0: cannot open shared object file`, run the
+same command in an environment where Playwright may install OS dependencies.

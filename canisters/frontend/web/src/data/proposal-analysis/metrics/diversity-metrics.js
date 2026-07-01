@@ -1,17 +1,25 @@
+import { normalizeRegistryRegion } from '../../topology/region-normalizer.js';
+
 function uniqueCount(values) {
   return new Set(values.filter((value) => typeof value === 'string' && value.length > 0)).size;
 }
 
-function countryFromRegion(region) {
-  if (typeof region !== 'string' || region.length === 0) return null;
-  const parts = region.split(',').map((part) => part.trim()).filter(Boolean);
-  return parts[parts.length - 1] ?? region;
+function normalizedCountry(node) {
+  return node.normalizedCountryCode
+    ?? node.normalizedCountryName
+    ?? normalizeRegistryRegion(node.dataCenterRegion).countryCode
+    ?? normalizeRegistryRegion(node.dataCenterRegion).countryName;
+}
+
+function normalizedContinent(node) {
+  return node.normalizedContinent ?? normalizeRegistryRegion(node.dataCenterRegion).continent;
 }
 
 export function diversityCounts(nodeIds = [], nodesById = {}) {
   const nodes = nodeIds.map((nodeId) => nodesById[nodeId]).filter(Boolean);
   return {
-    countries: uniqueCount(nodes.map((node) => countryFromRegion(node.dataCenterRegion))),
+    countries: uniqueCount(nodes.map((node) => normalizedCountry(node))),
+    continents: uniqueCount(nodes.map((node) => normalizedContinent(node))),
     nodeProviders: uniqueCount(nodes.map((node) => node.nodeProviderId)),
     nodeOperators: uniqueCount(nodes.map((node) => node.nodeOperatorId)),
     dataCenters: uniqueCount(nodes.map((node) => node.dataCenterId)),

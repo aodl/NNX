@@ -38,7 +38,7 @@ const fallbackProto = `enum Topic {
 
 export async function loadProto({
   fetchImpl = fetch,
-  protoUrlOverride = protoUrl,
+  protoUrlOverride = process.env.NNX_GOVERNANCE_PROTO_URL || protoUrl,
   cachePathOverride = cachePath,
   allowEmbedded = process.env.NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK === '1',
 } = {}) {
@@ -62,9 +62,9 @@ export async function loadProto({
       }
 
       throw new Error(
-          `Could not fetch upstream governance.proto and no pinned cache was available at ${path.relative(
-            process.cwd(),
-            cachePathOverride,
+        `Could not fetch upstream governance.proto and no pinned cache was available at ${path.relative(
+          process.cwd(),
+          cachePathOverride,
         )}. Set NNX_ALLOW_EMBEDDED_TOPIC_FALLBACK=1 to use the embedded emergency fallback. Fetch error: ${error.message}; cache error: ${cacheError.message}`,
       );
     }

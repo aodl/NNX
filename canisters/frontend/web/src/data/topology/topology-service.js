@@ -12,6 +12,7 @@ import {
   normalizeNodeProviderListResponse,
   normalizeSubnet,
 } from './topology-normalizers.js';
+import { normalizeRegistryRegion } from './region-normalizer.js';
 
 const DEFAULT_MAX_CONCURRENCY = 8;
 
@@ -193,7 +194,7 @@ async function loadKnownSubnets({
 }
 
 async function loadNodeRecords(rawRegistryClient, nodeIds, maxConcurrency) {
-  if (!rawRegistryClient?.getNodeRecord) {
+  if (!rawRegistryClient?.getNodeRecord && !rawRegistryClient?.getNodeRecordWithVersion) {
     return {
       nodeRecords: [],
       warnings: [topologyWarning(
@@ -208,7 +209,15 @@ async function loadNodeRecords(rawRegistryClient, nodeIds, maxConcurrency) {
     maxConcurrency,
     async (nodeId) => {
       try {
-        return { nodeRecord: await rawRegistryClient.getNodeRecord(nodeId), warnings: [] };
+        if (rawRegistryClient.getNodeRecordWithVersion) {
+          const versioned = await rawRegistryClient.getNodeRecordWithVersion(nodeId);
+          return {
+            nodeRecord: versioned.nodeRecord,
+            registryVersion: versioned.version,
+            warnings: [],
+          };
+        }
+        return { nodeRecord: await rawRegistryClient.getNodeRecord(nodeId), registryVersion: null, warnings: [] };
       } catch (error) {
         return {
           nodeRecord: null,
@@ -224,9 +233,25 @@ async function loadNodeRecords(rawRegistryClient, nodeIds, maxConcurrency) {
 
   const nodeRecords = [];
   const warnings = [];
+  const versions = new Map();
   for (const result of results) {
     warnings.push(...(result?.warnings ?? []));
-    if (result?.nodeRecord) nodeRecords.push(result.nodeRecord);
+    if (result?.nodeRecord) {
+      nodeRecords.push(result.nodeRecord);
+      if (result.registryVersion !== null && result.registryVersion !== undefined) {
+        const versionKey = result.registryVersion.toString();
+        if (!versions.has(versionKey)) versions.set(versionKey, []);
+        versions.get(versionKey).push(result.nodeRecord.nodeId);
+      }
+    }
+  }
+
+  if (versions.size > 1) {
+    warnings.push(topologyWarning(
+      TOPOLOGY_ERROR_CODES.REGISTRY_VERSION_INCONSISTENT,
+      'Registry node records were read from inconsistent versions; analysis should be treated as partial.',
+      { versions: Object.fromEntries(versions) },
+    ));
   }
 
   return { nodeRecords, warnings };
@@ -241,6 +266,7 @@ function buildNodeLocations(nodeIds, nodeRecords, topology, warnings = [], conte
     const dataCenter = nodeOperator?.dataCenterId
       ? topology.dataCentersById[nodeOperator.dataCenterId] ?? null
       : null;
+    const normalizedRegion = normalizeRegistryRegion(dataCenter?.region ?? null);
     if (!nodeOperatorId) {
       warnings.push(topologyWarning(
         TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
@@ -274,6 +300,10 @@ function buildNodeLocations(nodeIds, nodeRecords, topology, warnings = [], conte
       nodeProviderId: nodeOperator?.nodeProviderId ?? null,
       dataCenterId: dataCenter?.id ?? nodeOperator?.dataCenterId ?? null,
       dataCenterRegion: dataCenter?.region ?? null,
+      normalizedRegion,
+      normalizedCountryCode: normalizedRegion.countryCode,
+      normalizedCountryName: normalizedRegion.countryName,
+      normalizedContinent: normalizedRegion.continent,
       dataCenterOwner: dataCenter?.owner ?? null,
       gps: dataCenter?.gps ?? null,
       domain: nodeRecord?.domain ?? null,

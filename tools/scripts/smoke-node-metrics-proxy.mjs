@@ -27,8 +27,8 @@ async function readJsonIfExists(file) {
 }
 
 async function resolveCanisterId(network) {
-  if (process.env[PROXY_ENV]) return process.env[PROXY_ENV];
   if (process.env[PROXY_ALIAS_ENV]) return process.env[PROXY_ALIAS_ENV];
+  if (process.env[PROXY_ENV]) return process.env[PROXY_ENV];
   const files = network === 'local'
     ? ['.icp/cache/mappings/local.ids.json', '.icp/data/mappings/local.ids.json']
     : ['.icp/data/mappings/ic.ids.json'];

@@ -13,6 +13,8 @@ Good future candidates:
   insufficient for the UX or reporting need
 - NNX operational telemetry such as proxy health, query failures, partial-data
   incidents, and analysis runtime timings
+- onchain-derived alternative-node candidate snapshots, only after NNX has a
+  bounded onchain unassigned-node inventory query and a clear retention need
 
 Poor candidates:
 
@@ -57,3 +59,13 @@ provenance, stable-memory upgrade compatibility, partial-data records, and API
 bounds.
 
 No historian canister is implemented now.
+
+## Candidate-node analysis note
+
+Reviewer-grade alternative node suggestions require an onchain inventory of
+unassigned nodes plus complete Registry node/operator/data-center metadata. The
+current query facade loads node records for proposal-referenced or
+subnet-referenced node IDs; it does not yet expose a complete unassigned-node
+inventory. Until that bounded Registry inventory API exists, NNX should not
+display candidate replacements, because doing so would either be incomplete or
+would require prohibited offchain inventory sources.

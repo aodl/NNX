@@ -11,6 +11,7 @@ const DIVERSITY_CODES = Object.freeze({
   dataCenters: PROPOSAL_ISSUE_CODES.DIVERSITY_DECREASED_DATA_CENTER,
   owners: PROPOSAL_ISSUE_CODES.DIVERSITY_DECREASED_OWNER,
   countries: PROPOSAL_ISSUE_CODES.DIVERSITY_DECREASED_COUNTRY,
+  continents: PROPOSAL_ISSUE_CODES.DIVERSITY_DECREASED_CONTINENT,
 });
 
 const CONCENTRATION_CODES = Object.freeze({
@@ -45,11 +46,11 @@ export const diversityAnalyzer = Object.freeze({
     const issues = [];
 
     for (const [key, delta] of Object.entries(diversity.deltas)) {
-      if (delta < 0) {
+      if (DIVERSITY_CODES[key] && delta < 0) {
         issues.push(createIssue({
           ...common,
           code: DIVERSITY_CODES[key],
-          severity: key === 'countries' ? 'info' : 'warning',
+          severity: ['countries', 'continents'].includes(key) ? 'info' : 'warning',
           title: `${label(key)} diversity decreases`,
           message: `The number of distinct ${label(key)} decreases after this proposal.`,
           evidence: [

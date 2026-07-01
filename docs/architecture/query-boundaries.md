@@ -22,6 +22,13 @@ Narrowly allowed boundary zones:
 - node metrics proxy client boundary modules
 - focused tests and fixtures
 
+Raw Registry reads stay inside topology/query modules. The raw Registry client
+decodes normal `get_value` records and preserves returned Registry versions for
+multi-record consistency warnings. Chunked `largeValueChunkKeys` responses are
+not reconstructed yet; they surface as `REGISTRY_LARGE_VALUE_UNSUPPORTED` and
+downstream analysis treats affected data as partial/manual-review input instead
+of crashing.
+
 Run:
 
 ```sh

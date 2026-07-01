@@ -308,7 +308,7 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
     );
   }
 
-  async function getRawRegistryValue(key) {
+  async function getRawRegistryRecord(key) {
     let response;
     try {
       response = await agent.query(registryCanisterId, {
@@ -336,7 +336,7 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
       decoded = decodeRegistryGetValueResponse(response.reply.arg);
     } catch (error) {
       throw new IcTopologyError(
-        TOPOLOGY_ERROR_CODES.VALIDATION_FAILED,
+        TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED,
         'Failed to decode raw Registry get_value response.',
         error,
       );
@@ -344,7 +344,7 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
 
     if (decoded.error) {
       throw new IcTopologyError(
-        TOPOLOGY_ERROR_CODES.REGISTRY_RESPONSE_ERR,
+        TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_UNAVAILABLE,
         'Registry returned an error for a raw get_value query.',
         {
           key,
@@ -360,16 +360,34 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
           ? TOPOLOGY_ERROR_CODES.REGISTRY_LARGE_VALUE_UNSUPPORTED
           : TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_UNAVAILABLE,
         'Raw Registry get_value returned a chunked or empty value that this client cannot decode.',
+        { key },
       );
     }
 
-    return decoded.value;
+    return {
+      key,
+      value: decoded.value,
+      version: decoded.version,
+      timestampNanoseconds: decoded.timestampNanoseconds,
+    };
+  }
+
+  async function getRawRegistryValue(key) {
+    const record = await getRawRegistryRecord(key);
+    return record.value;
   }
 
   async function listSubnetIds() {
-    const value = await getRawRegistryValue(SUBNET_LIST_KEY);
+    return (await listSubnetIdsWithVersion()).subnetIds;
+  }
+
+  async function listSubnetIdsWithVersion() {
+    const record = await getRawRegistryRecord(SUBNET_LIST_KEY);
     try {
-      return decodeSubnetListRecord(value);
+      return {
+        subnetIds: decodeSubnetListRecord(record.value),
+        version: record.version,
+      };
     } catch (error) {
       throw new IcTopologyError(
         TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED,
@@ -380,11 +398,18 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
   }
 
   async function getNodeRecord(nodeId) {
-    const value = await getRawRegistryValue(nodeRecordKey(nodeId));
+    return (await getNodeRecordWithVersion(nodeId)).nodeRecord;
+  }
+
+  async function getNodeRecordWithVersion(nodeId) {
+    const record = await getRawRegistryRecord(nodeRecordKey(nodeId));
     try {
       return {
-        nodeId,
-        ...decodeNodeRecord(value),
+        nodeRecord: {
+          nodeId,
+          ...decodeNodeRecord(record.value),
+        },
+        version: record.version,
       };
     } catch (error) {
       throw new IcTopologyError(
@@ -397,7 +422,10 @@ export function createRawRegistryClient({ agent, registryCanisterId } = {}) {
 
   return Object.freeze({
     listSubnetIds,
+    listSubnetIdsWithVersion,
     getSubnetList: listSubnetIds,
     getNodeRecord,
+    getNodeRecordWithVersion,
+    getRawRegistryRecord,
   });
 }

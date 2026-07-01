@@ -157,6 +157,7 @@ export function renderProposalAnalysisPanel(analysis) {
       metricLine('Node operators', diversity.before.nodeOperators, diversity.after.nodeOperators),
       metricLine('Data centers', diversity.before.dataCenters, diversity.after.dataCenters),
       metricLine('Countries', diversity.before.countries, diversity.after.countries),
+      metricLine('Continents', diversity.before.continents, diversity.after.continents),
     );
     if (analysis.metrics.dfinityProvider) {
       decentralisation.append(metricLine(
@@ -198,6 +199,8 @@ export function renderAnalysisNodeDetails(node) {
     ['data center', node.dataCenterId],
     ['owner', node.dataCenterOwner],
     ['region', node.dataCenterRegion],
+    ['country', node.normalizedCountryName ?? node.normalizedCountryCode],
+    ['continent', node.normalizedContinent],
     ['GPS', node.gps ? `${node.gps.latitude}, ${node.gps.longitude}` : null],
     ['IPv4', node.publicIpv4?.ipAddr],
     ['IPv6', node.publicIpv6?.ipAddr],

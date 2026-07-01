@@ -17,6 +17,14 @@ const providerId = providerPrincipal.toText();
 const operatorPrincipal = Principal.fromText('2vxsx-fae');
 const subnetPrincipal = Principal.fromText('uuc56-gyb');
 const subnetId = subnetPrincipal.toText();
+const normalizedEurope = {
+  rawRegion: 'Europe',
+  cityOrRegion: null,
+  countryCode: null,
+  countryName: null,
+  continent: 'Europe',
+  unknown: false,
+};
 
 function principalBlob(principal) {
   return [...principal.toUint8Array()];
@@ -389,6 +397,65 @@ test('getIcTopology attaches known subnet records without full subnet discovery'
   assert.equal(topology.subnets[0].nodeCount, 1);
 });
 
+test('partial Registry node data flows into node details as warnings', async () => {
+  const otherNode = Principal.fromText('aaaaa-aa').toText();
+  let calls = 0;
+  const service = createTopologyService({
+    governance: {
+      list_node_providers: async () => ({ node_providers: [provider()] }),
+    },
+    registry: {
+      get_node_operators_and_dcs_of_node_provider: async () => ({ Ok: [[dataCenter(), nodeOperator()]] }),
+    },
+    rawRegistryClient: {
+      getNodeRecordWithVersion: async (nodeId) => {
+        calls += 1;
+        if (nodeId === otherNode) throw new IcTopologyError(
+          TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED,
+          'bad node record',
+        );
+        return {
+          nodeRecord: { nodeId, nodeOperatorId: operatorPrincipal.toText() },
+          version: 7n,
+        };
+      },
+    },
+  });
+
+  const result = await service.getIcNodeDetails({ nodeIds: [operatorPrincipal.toText(), otherNode] });
+
+  assert.equal(calls, 2);
+  assert.equal(result.nodeLocations.length, 1);
+  assert.ok(result.warnings.some((warning) => (
+    warning.code === TOPOLOGY_ERROR_CODES.REGISTRY_RECORD_DECODE_FAILED
+  )));
+});
+
+test('inconsistent Registry versions across node records emit a warning', async () => {
+  const otherNode = Principal.fromText('aaaaa-aa').toText();
+  const service = createTopologyService({
+    governance: {
+      list_node_providers: async () => ({ node_providers: [provider()] }),
+    },
+    registry: {
+      get_node_operators_and_dcs_of_node_provider: async () => ({ Ok: [[dataCenter(), nodeOperator()]] }),
+    },
+    rawRegistryClient: {
+      getNodeRecordWithVersion: async (nodeId) => ({
+        nodeRecord: { nodeId, nodeOperatorId: operatorPrincipal.toText() },
+        version: nodeId === otherNode ? 8n : 7n,
+      }),
+    },
+  });
+
+  const result = await service.getIcNodeDetails({ nodeIds: [operatorPrincipal.toText(), otherNode] });
+
+  assert.equal(result.nodeLocations.length, 2);
+  assert.ok(result.warnings.some((warning) => (
+    warning.code === TOPOLOGY_ERROR_CODES.REGISTRY_VERSION_INCONSISTENT
+  )));
+});
+
 test('getIcSubnetDetails joins subnet nodes to data center GPS', async () => {
   const service = createTopologyService({
     governance: {
@@ -417,6 +484,10 @@ test('getIcSubnetDetails joins subnet nodes to data center GPS', async () => {
     nodeProviderId: providerId,
     dataCenterId: 'dc-1',
     dataCenterRegion: 'Europe',
+    normalizedRegion: normalizedEurope,
+    normalizedCountryCode: null,
+    normalizedCountryName: null,
+    normalizedContinent: 'Europe',
     dataCenterOwner: 'Node Provider Ltd',
     gps: { latitude: 52.52, longitude: 13.405 },
     domain: null,
@@ -455,6 +526,10 @@ test('getIcNodeDetails joins arbitrary Registry node records to data center GPS'
     nodeProviderId: providerId,
     dataCenterId: 'dc-1',
     dataCenterRegion: 'Europe',
+    normalizedRegion: normalizedEurope,
+    normalizedCountryCode: null,
+    normalizedCountryName: null,
+    normalizedContinent: 'Europe',
     dataCenterOwner: 'Node Provider Ltd',
     gps: { latitude: 52.52, longitude: 13.405 },
     domain: null,

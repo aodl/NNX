@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -47,4 +47,11 @@ test('topic generation embedded fallback requires explicit enablement', async ()
     allowEmbedded: true,
   });
   assert.match(loaded, /TOPIC_API_BOUNDARY_NODE_MANAGEMENT/);
+});
+
+test('committed governance.proto cache is present and readable', async () => {
+  const cachePath = path.resolve('tools/cache/governance.proto');
+  await access(cachePath);
+  const cachedProto = await readFile(cachePath, 'utf8');
+  assert.match(cachedProto, /\benum\s+Topic\s*\{/);
 });

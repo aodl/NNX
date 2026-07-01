@@ -20,7 +20,7 @@ Analysis is lifecycle-aware:
 - successfully executed proposals are checked against current postconditions;
 - failed or rejected proposals do not receive warnings that their intended state did not happen.
 
-API boundary domain and IPv4 checks use Registry `NodeRecord` fields decoded behind the query facade. NNX does not perform IP-geolocation validation because the IC does not currently expose an onchain IP-triangulation source. Registry GPS is onchain data-center metadata. External tools such as Globalping can be used manually by reviewers.
+API boundary domain and IPv4 checks use Registry `NodeRecord` fields decoded behind the query facade. NNX does not perform IP-geolocation validation because the IC does not currently expose an onchain IP-triangulation source. Registry GPS and data-center region strings are onchain data-center metadata. Country and continent normalization only interprets those Registry-provided region/country strings with a static mapping; it is not IP geolocation. External tools such as Globalping can be used manually by reviewers.
 
 The DFINITY provider check uses the fixed provider principal from `analysis-policy.js`; it does not infer provider control from display names.
 

@@ -1,8 +1,4 @@
-function countryFromRegion(region) {
-  if (typeof region !== 'string' || region.length === 0) return null;
-  const parts = region.split(',').map((part) => part.trim()).filter(Boolean);
-  return parts[parts.length - 1] ?? region;
-}
+import { normalizeRegistryRegion } from '../../topology/region-normalizer.js';
 
 function maxBy(values) {
   const counts = new Map();
@@ -23,12 +19,18 @@ function maxBy(values) {
 
 function concentrationCounts(nodeIds, nodesById) {
   const nodes = nodeIds.map((nodeId) => nodesById[nodeId]).filter(Boolean);
+  const country = (node) => node.normalizedCountryCode
+    ?? node.normalizedCountryName
+    ?? normalizeRegistryRegion(node.dataCenterRegion).countryCode
+    ?? normalizeRegistryRegion(node.dataCenterRegion).countryName;
+  const continent = (node) => node.normalizedContinent ?? normalizeRegistryRegion(node.dataCenterRegion).continent;
   return {
     provider: maxBy(nodes.map((node) => node.nodeProviderId)),
     operator: maxBy(nodes.map((node) => node.nodeOperatorId)),
     dataCenter: maxBy(nodes.map((node) => node.dataCenterId)),
     owner: maxBy(nodes.map((node) => node.dataCenterOwner)),
-    country: maxBy(nodes.map((node) => countryFromRegion(node.dataCenterRegion))),
+    country: maxBy(nodes.map(country)),
+    continent: maxBy(nodes.map(continent)),
   };
 }
 
