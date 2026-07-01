@@ -5,12 +5,14 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { HttpAgent } from '@icp-sdk/core/agent';
 import { Principal } from '@icp-sdk/core/principal';
-import { createNodeMetricsProxyActor } from '../../canisters/frontend/web/src/data/node-health-metrics/node-metrics-proxy-client.js';
+import { createHistorianActor } from '../../canisters/frontend/web/src/data/node-health-metrics/historian-client.js';
 
 const execFileAsync = promisify(execFile);
 const projectRoot = path.resolve(import.meta.dirname, '../..');
-const PROXY_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
-const PROXY_ALIAS_ENV = 'NNX_NODE_METRICS_PROXY_CANISTER_ID';
+const HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_historian';
+const HISTORIAN_ALIAS_ENV = 'NNX_HISTORIAN_CANISTER_ID';
+const LEGACY_HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
+const LEGACY_HISTORIAN_ALIAS_ENV = 'NNX_NODE_METRICS_PROXY_CANISTER_ID';
 const DEFAULT_SUBNET_ID = 'tdb26-jop6k-aogll-7ltgs-eruif-6kk7m-qpktf-gdiqx-mxtrf-vb5e6-eqe';
 
 function argValue(name) {
@@ -27,16 +29,18 @@ async function readJsonIfExists(file) {
 }
 
 async function resolveCanisterId(network) {
-  if (process.env[PROXY_ALIAS_ENV]) return process.env[PROXY_ALIAS_ENV];
-  if (process.env[PROXY_ENV]) return process.env[PROXY_ENV];
+  if (process.env[HISTORIAN_ALIAS_ENV]) return process.env[HISTORIAN_ALIAS_ENV];
+  if (process.env[HISTORIAN_ENV]) return process.env[HISTORIAN_ENV];
+  if (process.env[LEGACY_HISTORIAN_ALIAS_ENV]) return process.env[LEGACY_HISTORIAN_ALIAS_ENV];
+  if (process.env[LEGACY_HISTORIAN_ENV]) return process.env[LEGACY_HISTORIAN_ENV];
   const files = network === 'local'
     ? ['.icp/cache/mappings/local.ids.json', '.icp/data/mappings/local.ids.json']
     : ['.icp/data/mappings/ic.ids.json'];
   for (const file of files) {
     const mapping = await readJsonIfExists(file);
-    if (typeof mapping?.nnx_node_metrics_proxy === 'string') return mapping.nnx_node_metrics_proxy;
+    if (typeof mapping?.nnx_historian === 'string') return mapping.nnx_historian;
   }
-  throw new Error(`Could not resolve nnx_node_metrics_proxy canister ID for ${network}.`);
+  throw new Error(`Could not resolve nnx_historian canister ID for ${network}.`);
 }
 
 async function localHost() {
@@ -62,16 +66,16 @@ if (!['local', 'ic'].includes(network)) {
 }
 
 const subnetId = argValue('--subnet-id') ?? process.env.NNX_NODE_METRICS_SUBNET_ID ?? DEFAULT_SUBNET_ID;
-const proxyCanisterId = await resolveCanisterId(network);
+const historianCanisterId = await resolveCanisterId(network);
 const host = network === 'local' ? await localHost() : 'https://icp-api.io';
 const agent = await HttpAgent.create({ host, verifyQuerySignatures: true });
 if (network === 'local') await agent.fetchRootKey();
 
-const actor = createNodeMetricsProxyActor({ agent, canisterId: proxyCanisterId });
+const actor = createHistorianActor({ agent, canisterId: historianCanisterId });
 const endAtTimestampNanos = BigInt(Date.now()) * 1_000_000n;
 const startAtTimestampNanos = endAtTimestampNanos - 60n * 60n * 1_000_000_000n;
 
-console.log(`Proxy: ${proxyCanisterId}`);
+console.log(`Historian: ${historianCanisterId}`);
 console.log(`Network: ${network}`);
 console.log(`Subnet: ${subnetId}`);
 
@@ -83,7 +87,7 @@ try {
     end_at_timestamp_nanos: endAtTimestampNanos,
   }));
 } catch (error) {
-  console.error('Valid node metrics proxy call trapped or rejected before typed response.');
+  console.error('Valid historian call trapped or rejected before typed response.');
   throw error;
 }
 
@@ -94,7 +98,7 @@ if (errorCodes.includes('MANAGEMENT_CANISTER_DECODE_FAILED')) {
 const acceptable = errorCodes.length === 0
   || errorCodes.every((code) => code === 'MANAGEMENT_CANISTER_CALL_FAILED' || code === 'RESPONSE_TRUNCATED');
 if (!acceptable) {
-  throw new Error(`Unexpected node metrics proxy errors: ${errorCodes.join(', ')}`);
+  throw new Error(`Unexpected historian errors: ${errorCodes.join(', ')}`);
 }
 
 console.log(`Records: ${response.records.length}`);

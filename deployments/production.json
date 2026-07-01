@@ -1,0 +1,14 @@
+{
+  "network": "ic",
+  "environment": "production",
+  "frontend": {
+    "name": "nnx_frontend",
+    "canisterId": null,
+    "url": null
+  },
+  "historian": {
+    "name": "nnx_historian",
+    "canisterId": null
+  },
+  "status": "placeholder"
+}

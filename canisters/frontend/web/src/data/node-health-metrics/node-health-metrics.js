@@ -43,7 +43,7 @@ export async function getSubnetNodeHealthMetrics({
       metrics: (nodeIds ?? []).map((nodeId) => unavailableMetric(nodeId, windowHours)),
       summary: {},
       partial: true,
-      errors: [{ code: 'NODE_METRICS_UNAVAILABLE', message: 'Node metrics proxy is not configured.' }],
+      errors: [{ code: 'NODE_METRICS_UNAVAILABLE', message: 'Historian is not configured.' }],
     };
   }
 

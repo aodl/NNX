@@ -67,9 +67,8 @@ browser agent code, fetch and follow the current Internet Computer skills index:
   APIs, timers, durable NNX state, or historian state.
 - `nnx_historian` is the separate staging canister for
   `node_metrics_history` access and future bounded historical sampling.
-- The current source tree still contains the transitional
-  `nnx_node_metrics_proxy` package/canister name. Treat `nnx_historian` as the
-  durable canister name for deployment policy and new docs.
+- `nnx_historian` is the repo-facing canister/package name for bounded
+  `node_metrics_history` access and future bounded historical sampling.
 - UI/domain modules consume normalized query-facade/service objects only.
 - UI/domain modules must not import actors, agents, generated Candid
   declarations, raw Registry keys, protobuf decode internals, Principal
@@ -198,12 +197,6 @@ Historian/node metrics smoke when configured:
 
 ```sh
 npm run smoke:historian-node-metrics -- --network ic --subnet-id <real-subnet-id>
-```
-
-If the source rename is not complete, use the current equivalent script:
-
-```sh
-npm run smoke:node-metrics-proxy -- --network ic --subnet-id <real-subnet-id>
 ```
 
 There is intentionally no automated browser-test dependency. Browser behavior is

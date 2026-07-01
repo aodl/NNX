@@ -93,9 +93,9 @@ test('metric objects include first and last timestamps and sample count', () => 
   assert.equal(metric.sampleCount, 2);
 });
 
-test('unavailable metrics when proxy query fails', async () => {
+test('unavailable metrics when historian query fails', async () => {
   const result = await getSubnetNodeHealthMetrics({
-    queryFacade: { getNodeMetricsHistory: async () => { throw new Error('no proxy'); } },
+    queryFacade: { getNodeMetricsHistory: async () => { throw new Error('no historian'); } },
     subnetId: 'subnet',
     nodeIds: ['node-1'],
     startAtTimestampNanos: 1n,

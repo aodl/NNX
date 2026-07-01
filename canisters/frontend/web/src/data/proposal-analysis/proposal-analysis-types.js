@@ -68,13 +68,12 @@ export function proposalLifecycle(proposal) {
   const rewardStatusKind = String(proposal?.rewardStatusKind ?? proposal?.rewardStatusLabel ?? '').toLowerCase();
   const status = Number(proposal?.status);
 
-  if (statusKind === 'open' || rewardStatusKind === 'accepting-votes' || status === 1) {
-    return 'pre_execution';
-  }
-  if (statusKind === 'adopted' || status === 3) return 'pre_execution';
   if (statusKind === 'executed' || status === 4) return 'post_execution_success';
   if (statusKind === 'failed' || status === 5) return 'post_execution_failed';
   if (statusKind === 'rejected' || status === 2) return 'rejected';
+  if (statusKind === 'adopted' || status === 3) return 'pre_execution';
+  if (statusKind === 'open' || status === 1) return 'pre_execution';
+  if (rewardStatusKind === 'accepting-votes') return 'pre_execution';
   return 'unknown';
 }
 

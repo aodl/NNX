@@ -12,9 +12,9 @@ import { createRawRegistryClient } from '../topology/raw-registry-client.js';
 import { createTopologyService } from '../topology/topology-service.js';
 import { IcTopologyError, TOPOLOGY_ERROR_CODES } from '../topology/topology-errors.js';
 import {
-  createNodeMetricsProxyActor,
-  createNodeMetricsProxyClient,
-} from '../node-health-metrics/node-metrics-proxy-client.js';
+  createHistorianActor,
+  createHistorianClient,
+} from '../node-health-metrics/historian-client.js';
 import { readApiBoundaryMembership } from '../topology/api-boundary-membership.js';
 import {
   normalizeCmcDefaultSubnetsResponse,
@@ -28,7 +28,8 @@ import {
 const KNOWN_NEURON_CACHE_MS = 60 * 60 * 1000;
 const PROPOSAL_REWARD_STATUS_ACCEPT_VOTES = 1;
 const PROPOSAL_PAGE_LIMIT = 100;
-const NODE_METRICS_PROXY_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
+const HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_historian';
+const LEGACY_HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
 
 function canisterEnvValue(name) {
   const sdkEnv = safeGetCanisterEnv?.() ?? null;
@@ -55,6 +56,14 @@ async function generatedFrontendEnvValue(name) {
   } catch {
     return null;
   }
+}
+
+async function historianCanisterEnvValue() {
+  return canisterEnvValue(HISTORIAN_ENV)
+    ?? await generatedFrontendEnvValue(HISTORIAN_ENV)
+    ?? canisterEnvValue(LEGACY_HISTORIAN_ENV)
+    ?? await generatedFrontendEnvValue(LEGACY_HISTORIAN_ENV)
+    ?? null;
 }
 
 export function listAcceptingVotesProposalsRequest(beforeProposalId = null) {
@@ -114,6 +123,7 @@ export async function createAgentQueryBackend({
   cmcCanisterId = NNS_CMC_CANISTER_ID,
   governanceCanisterId = NNS_GOVERNANCE_CANISTER_ID,
   registryCanisterId = NNS_REGISTRY_CANISTER_ID,
+  historianCanisterId = null,
   nodeMetricsProxyCanisterId = null,
 } = {}) {
   let agent;
@@ -151,13 +161,13 @@ export async function createAgentQueryBackend({
 
   const rawRegistryClient = createRawRegistryClient({ agent, registryCanisterId });
   const topologyService = createTopologyService({ governance, registry, rawRegistryClient });
-  const resolvedNodeMetricsProxyCanisterId = nodeMetricsProxyCanisterId
-    ?? canisterEnvValue(NODE_METRICS_PROXY_ENV)
-    ?? await generatedFrontendEnvValue(NODE_METRICS_PROXY_ENV)
+  const resolvedHistorianCanisterId = historianCanisterId
+    ?? nodeMetricsProxyCanisterId
+    ?? await historianCanisterEnvValue()
     ?? null;
-  const nodeMetricsProxyClient = createNodeMetricsProxyClient({
-    actor: resolvedNodeMetricsProxyCanisterId
-      ? createNodeMetricsProxyActor({ agent, canisterId: resolvedNodeMetricsProxyCanisterId })
+  const historianClient = createHistorianClient({
+    actor: resolvedHistorianCanisterId
+      ? createHistorianActor({ agent, canisterId: resolvedHistorianCanisterId })
       : null,
   });
   let knownNeuronNames = new Map();
@@ -272,7 +282,7 @@ export async function createAgentQueryBackend({
     getIcSubnets: topologyService.getIcSubnets,
     getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,
-    getNodeMetricsHistory: nodeMetricsProxyClient.getNodeMetricsHistory,
+    getNodeMetricsHistory: historianClient.getNodeMetricsHistory,
     getApiBoundaryNodeIds,
     getCmcSubnetLabels,
     refreshIcTopology: topologyService.refreshIcTopology,

@@ -1,0 +1,15 @@
+{
+  "network": "ic",
+  "environment": "staging",
+  "frontend": {
+    "name": "nnx_frontend_staging",
+    "canisterId": "6h2pa-qiaaa-aaaao-qp4fa-cai",
+    "url": "https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/"
+  },
+  "historian": {
+    "name": "nnx_historian_staging",
+    "canisterId": "yo47z-piaaa-aaaac-qg3xa-cai"
+  },
+  "deploymentTool": "dfx operator command",
+  "deploymentIdentity": "codex-local"
+}

@@ -24,10 +24,11 @@ static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/public");
 
 const PRIVATE_BUILD_MANIFEST_PATH: &str = "generated/frontend-bundle.json";
 const PUBLIC_FRONTEND_ENV_PATH: &str = "generated/frontend-env.json";
+const PUBLIC_BUILD_INFO_PATH: &str = "generated/build-info.json";
 const PLACEHOLDER_BUNDLE_PATH: &str = "/generated/app.placeholder.js";
 const IMMUTABLE_ASSET_CACHE_CONTROL: &str = "public, max-age=31536000, immutable";
 const NO_CACHE_ASSET_CACHE_CONTROL: &str = "public, no-cache, no-store";
-const NODE_METRICS_PROXY_ENV: &str = "PUBLIC_CANISTER_ID:nnx_node_metrics_proxy";
+const HISTORIAN_ENV: &str = "PUBLIC_CANISTER_ID:nnx_historian";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct HeadAssetKey {
@@ -216,6 +217,14 @@ fn certify_all_assets() {
             aliased_by: vec![],
             encodings: vec![AssetEncoding::Gzip.default_config()],
         },
+        AssetConfig::File {
+            path: PUBLIC_BUILD_INFO_PATH.to_string(),
+            content_type: Some("application/json".to_string()),
+            headers: asset_headers("same-origin", NO_CACHE_ASSET_CACHE_CONTROL),
+            fallback_for: vec![],
+            aliased_by: vec![],
+            encodings: vec![AssetEncoding::Gzip.default_config()],
+        },
         AssetConfig::Pattern {
             pattern: "**/*.css".to_string(),
             content_type: Some("text/css".to_string()),
@@ -329,6 +338,17 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
         headers_for_path(".well-known/ic-domains", ic_domains.contents().len()),
         HeadAssetMatchKind::Exact,
     )?;
+    for path in [PUBLIC_FRONTEND_ENV_PATH, PUBLIC_BUILD_INFO_PATH] {
+        if let Some(file) = dir.get_file(path) {
+            insert_head_asset(
+                &mut head_assets,
+                &format!("/{path}"),
+                StatusCode::OK,
+                headers_for_path(path, file.contents().len()),
+                HeadAssetMatchKind::Exact,
+            )?;
+        }
+    }
     insert_head_asset(
         &mut head_assets,
         "/404",
@@ -575,7 +595,7 @@ fn is_public_route(path: &str) -> bool {
     if path.starts_with("/generated/app.") && path.ends_with(".js") {
         return true;
     }
-    if path == "/generated/frontend-env.json" {
+    if path == "/generated/frontend-env.json" || path == "/generated/build-info.json" {
         return true;
     }
     is_valid_id_route(path, "/neuron/")
@@ -721,6 +741,8 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
             || path == "base.css"
             || path == ".well-known/ic-domains"
             || path == "map/ne_110m_land.geojson"
+            || path == PUBLIC_FRONTEND_ENV_PATH
+            || path == PUBLIC_BUILD_INFO_PATH
         {
             NO_CACHE_ASSET_CACHE_CONTROL
         } else {
@@ -734,7 +756,7 @@ fn headers_for_path(path: &str, content_length: usize) -> Vec<HeaderField> {
             "index.html" | "404.html" => "text/html",
             ".well-known/ic-domains" => "text/plain",
             "map/ne_110m_land.geojson" => "application/geo+json",
-            "generated/frontend-env.json" => "application/json",
+            "generated/frontend-env.json" | "generated/build-info.json" => "application/json",
             _ if path.ends_with(".js") => "text/javascript",
             _ if path.ends_with(".css") => "text/css",
             _ => "application/octet-stream",
@@ -773,12 +795,12 @@ fn canister_env_value(_name: &str) -> Option<String> {
 }
 
 fn ic_env_cookie_header() -> Option<HeaderField> {
-    let proxy_id = canister_env_value(NODE_METRICS_PROXY_ENV)?;
+    let proxy_id = canister_env_value(HISTORIAN_ENV)?;
     let mut values = Vec::new();
     if let Some(root_key) = canister_env_value("IC_ROOT_KEY") {
         values.push(format!("ic_root_key={root_key}"));
     }
-    values.push(format!("{NODE_METRICS_PROXY_ENV}={proxy_id}"));
+    values.push(format!("{HISTORIAN_ENV}={proxy_id}"));
     Some((
         "set-cookie".to_string(),
         format!("ic_env={}; Path=/; SameSite=Strict", values.join("&")),
@@ -1015,6 +1037,41 @@ mod tests {
         assert_eq!(
             header_value(&response, "cache-control"),
             Some(IMMUTABLE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn generated_build_info_is_public_no_cache_json_when_built() {
+        if ASSETS_DIR.get_file(PUBLIC_BUILD_INFO_PATH).is_none() {
+            return;
+        }
+        let response = get("/generated/build-info.json");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("application/json")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
+        );
+    }
+
+    #[test]
+    fn head_generated_build_info_is_exactly_certified_when_built() {
+        if ASSETS_DIR.get_file(PUBLIC_BUILD_INFO_PATH).is_none() {
+            return;
+        }
+        let response = head("/generated/build-info.json");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert!(response.body().is_empty());
+        assert_eq!(
+            header_value(&response, "content-type"),
+            Some("application/json")
+        );
+        assert_eq!(
+            header_value(&response, "cache-control"),
+            Some(NO_CACHE_ASSET_CACHE_CONTROL)
         );
     }
 

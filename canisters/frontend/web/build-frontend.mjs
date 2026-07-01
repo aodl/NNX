@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { build } from 'esbuild';
+import { createBuildInfo } from './build-info.mjs';
 import { resolveFrontendEnv } from './build-frontend-env.mjs';
 
 const projectRoot = path.resolve(import.meta.dirname, '../../..');
@@ -37,6 +38,8 @@ for (const warning of frontendEnvWarnings) {
   console.warn(warning);
 }
 
+const buildInfo = await createBuildInfo({ projectRoot, frontendEnv });
+
 await writeFile(path.join(generatedDir, bundleFile), bundle);
 await writeFile(
   path.join(generatedDir, 'frontend-bundle.json'),
@@ -45,4 +48,8 @@ await writeFile(
 await writeFile(
   path.join(generatedDir, 'frontend-env.json'),
   `${JSON.stringify(frontendEnv, null, 2)}\n`,
+);
+await writeFile(
+  path.join(generatedDir, 'build-info.json'),
+  `${JSON.stringify(buildInfo, null, 2)}\n`,
 );

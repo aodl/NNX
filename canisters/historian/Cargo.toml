@@ -1,5 +1,5 @@
 [package]
-name = "nnx-node-metrics-proxy"
+name = "nnx-historian"
 version = "0.1.0"
 edition = "2021"
 publish = false

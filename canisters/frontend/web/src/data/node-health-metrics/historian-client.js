@@ -31,7 +31,7 @@ export function idlFactory({ IDL: idl }) {
   });
 }
 
-export function createNodeMetricsProxyActor({ agent, canisterId }) {
+export function createHistorianActor({ agent, canisterId }) {
   if (!agent || !canisterId) return null;
   return Actor.createActor(idlFactory, { agent, canisterId });
 }
@@ -41,7 +41,7 @@ function toPrincipal(value) {
   return Principal.fromText(value);
 }
 
-export function createNodeMetricsProxyClient({ actor = null } = {}) {
+export function createHistorianClient({ actor = null } = {}) {
   return Object.freeze({
     async getNodeMetricsHistory(args) {
       if (!actor?.get_node_metrics_history) {
@@ -51,7 +51,7 @@ export function createNodeMetricsProxyClient({ actor = null } = {}) {
           endAtTimestampNanos: args.endAtTimestampNanos,
           records: [],
           partial: true,
-          errors: [{ code: 'NODE_METRICS_PROXY_NOT_CONFIGURED', message: 'Node metrics proxy actor is unavailable.' }],
+          errors: [{ code: 'HISTORIAN_NOT_CONFIGURED', message: 'Historian actor is unavailable.' }],
         };
       }
       const response = await actor.get_node_metrics_history({

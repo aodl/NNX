@@ -122,6 +122,47 @@ test('mainnet proposal fixtures analyze without crashing', async () => {
   }
 });
 
+test('proposal lifecycle status wins over accepting-votes reward status', () => {
+  assert.equal(proposalLifecycle({ statusKind: 'executed', rewardStatusKind: 'accepting-votes' }), 'post_execution_success');
+  assert.equal(proposalLifecycle({ statusKind: 'failed', rewardStatusKind: 'accepting-votes' }), 'post_execution_failed');
+  assert.equal(proposalLifecycle({ statusKind: 'rejected', rewardStatusKind: 'accepting-votes' }), 'rejected');
+  assert.equal(proposalLifecycle({ statusKind: 'adopted', rewardStatusKind: 'accepting-votes' }), 'pre_execution');
+  assert.equal(proposalLifecycle({ statusKind: 'open', rewardStatusKind: 'accepting-votes' }), 'pre_execution');
+  assert.equal(proposalLifecycle({ rewardStatusKind: 'accepting-votes' }), 'pre_execution');
+  assert.equal(proposalLifecycle({ status: 4, rewardStatusKind: 'accepting-votes' }), 'post_execution_success');
+  assert.equal(proposalLifecycle({ status: 5, rewardStatusKind: 'accepting-votes' }), 'post_execution_failed');
+  assert.equal(proposalLifecycle({ status: 2, rewardStatusKind: 'accepting-votes' }), 'rejected');
+});
+
+test('executed accepting-votes remove-node fixture uses postcondition analysis only', async () => {
+  const fixture = (await loadFixtures())
+    .map((entry) => entry.fixture)
+    .find((entry) => entry.proposalId === '142595');
+  assert.ok(fixture);
+  const proposal = proposalFromFixture({
+    ...fixture,
+    actionTypeName: 'RemoveNodesFromSubnet',
+    actionValues: fixture.actionValues.filter((entry) => entry.name === 'node_ids_remove' || entry.name === 'subnet_id'),
+    parsedIntent: {
+      ...fixture.parsedIntent,
+      actionKind: 'RemoveNodesFromSubnet',
+      addNodeIds: [],
+    },
+  });
+  const analysisService = createProposalAnalysisService({ queryFacade: queryFacade() });
+  const analysis = await analysisService.analyzeProposalObject({ proposal, mode: 'full' });
+
+  assert.equal(analysis.lifecycle, 'post_execution_success');
+  assert.equal(
+    analysis.issues.some((issue) => issue.code === PROPOSAL_ISSUE_CODES.REMOVE_NODE_ALREADY_UNASSIGNED),
+    false,
+  );
+  assert.equal(
+    analysis.issues.every((issue) => issue.lifecycle !== 'pre_execution'),
+    true,
+  );
+});
+
 test('fixture-backed proposal URLs still require safe URL rendering', async () => {
   for (const { fixture } of await loadFixtures()) {
     const proposal = proposalFromFixture(fixture);

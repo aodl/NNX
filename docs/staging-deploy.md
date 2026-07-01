@@ -25,19 +25,18 @@ dfx canister --network ic status yo47z-piaaa-aaaac-qg3xa-cai
 Build with staging IDs in the frontend environment:
 
 ```sh
+ICP_NETWORK=ic \
 NNX_DEPLOY_ENVIRONMENT=staging \
 NNX_FRONTEND_CANISTER_ID=6h2pa-qiaaa-aaaao-qp4fa-cai \
 NNX_HISTORIAN_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai \
-NNX_NODE_METRICS_PROXY_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai \
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_staging.wasm \
 ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
 
+ICP_NETWORK=ic \
 NNX_DEPLOY_ENVIRONMENT=staging \
-NNX_FRONTEND_CANISTER_ID=6h2pa-qiaaa-aaaao-qp4fa-cai \
 NNX_HISTORIAN_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai \
-NNX_NODE_METRICS_PROXY_CANISTER_ID=yo47z-piaaa-aaaac-qg3xa-cai \
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_historian_staging.wasm \
-./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
+./tools/scripts/icp-build-canister nnx-historian nnx_historian
 ```
 
 If `dfx` requires canister names, create temporary config outside the repo, for
@@ -50,12 +49,34 @@ Upgrade only the exact staging canister IDs:
 ```sh
 dfx canister --network ic install 6h2pa-qiaaa-aaaao-qp4fa-cai \
   --mode upgrade \
-  --wasm /tmp/nnx_frontend_staging.wasm
+  --wasm /tmp/nnx_frontend_staging.wasm \
+  --argument '()'
 
 dfx canister --network ic install yo47z-piaaa-aaaac-qg3xa-cai \
   --mode upgrade \
-  --wasm /tmp/nnx_historian_staging.wasm
+  --wasm /tmp/nnx_historian_staging.wasm \
+  --argument '()'
 ```
+
+Verify staging:
+
+```sh
+curl -fsS https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/ | head
+curl -fsS https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/generated/frontend-env.json
+curl -fsS https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/generated/build-info.json
+curl -fsSI https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/proposal/not-a-number
+curl -fsSI https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/neuron/not-a-number
+curl -fsSI https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/subnet/not-a-principal
+```
+
+Expected:
+
+- `/` returns the app shell.
+- `frontend-env.json` references `yo47z-piaaa-aaaac-qg3xa-cai` as
+  `PUBLIC_CANISTER_ID:nnx_historian`.
+- `build-info.json` references the deployed commit, `staging`, frontend ID, and
+  historian ID.
+- malformed proposal/neuron/subnet routes return 404.
 
 Rules:
 

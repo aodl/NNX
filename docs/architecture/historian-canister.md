@@ -5,9 +5,46 @@ The historian currently exists in staging as a bounded
 historical records. Any future sampling/storage must be bounded, paged,
 provenance-rich, and tested.
 
-The source tree still contains the transitional `nnx_node_metrics_proxy`
-package/canister name. Treat `nnx_historian` as the durable canister name for
-deployment policy and new documentation until the source rename is completed.
+The historian is implemented today as a bounded `node_metrics_history` proxy. It
+does not yet persist durable historical records. Future periodic sampling must
+be bounded, paged, provenance-rich, and tested before being enabled.
+
+The public method is intentionally an update method:
+
+```candid
+get_node_metrics_history : (NodeMetricsHistoryArgs) -> (NodeMetricsHistoryResponse);
+```
+
+The IC management canister `node_metrics_history` method is canister-only and
+experimental. The historian calls the management canister with the official
+management argument shape:
+
+```candid
+record {
+  subnet_id : principal;
+  start_at_timestamp_nanos : nat64;
+}
+```
+
+The public NNX request also includes `end_at_timestamp_nanos`; that field is not
+sent to the management canister. It is used for validation, window bounding, and
+filtering returned samples.
+
+Bounds:
+
+- maximum time window: 24 hours
+- maximum normalized records returned: 20,000
+- normal errors return typed `errors` with `partial: true`; they do not trap
+- invalid time ranges return `INVALID_TIME_RANGE`
+- too-large windows return `WINDOW_TOO_LARGE`
+- management rejects return `MANAGEMENT_CANISTER_CALL_FAILED`
+- management response decode failures return `MANAGEMENT_CANISTER_DECODE_FAILED`
+- response truncation returns `RESPONSE_TRUNCATED` with `partial: true`
+- empty successful management results return `partial: false` and `records: []`
+
+Frontend discovery prefers `PUBLIC_CANISTER_ID:nnx_historian` or
+`NNX_HISTORIAN_CANISTER_ID`. The old node-metrics-proxy env names are accepted
+only as one-release compatibility fallbacks.
 
 The historian should store data only when NNX needs bounded historical or
 derived time-series data that system canisters do not already expose in a usable
@@ -21,7 +58,7 @@ Good future candidates:
   while a proposal was pending
 - derived topology or concentration snapshots, if Registry version history is
   insufficient for the UX or reporting need
-- NNX operational telemetry such as proxy health, query failures, partial-data
+- NNX operational telemetry such as historian health, query failures, partial-data
   incidents, and analysis runtime timings
 - onchain-derived alternative-node candidate snapshots, only after NNX has a
   bounded onchain unassigned-node inventory query and a clear retention need

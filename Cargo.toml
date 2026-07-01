@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
   "canisters/frontend",
-  "canisters/node_metrics_proxy",
+  "canisters/historian",
 ]
 
 [workspace.dependencies]

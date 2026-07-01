@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-export const NODE_METRICS_PROXY_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
-export const NODE_METRICS_PROXY_ALIAS_ENV = 'NNX_NODE_METRICS_PROXY_CANISTER_ID';
+export const HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_historian';
+export const HISTORIAN_ALIAS_ENV = 'NNX_HISTORIAN_CANISTER_ID';
+const LEGACY_HISTORIAN_ENV = 'PUBLIC_CANISTER_ID:nnx_node_metrics_proxy';
+const LEGACY_HISTORIAN_ALIAS_ENV = 'NNX_NODE_METRICS_PROXY_CANISTER_ID';
 
 async function readJsonIfExists(projectRoot, file, warnings) {
   try {
@@ -16,7 +18,11 @@ async function readJsonIfExists(projectRoot, file, warnings) {
 }
 
 function explicitCanisterId(env) {
-  return env[NODE_METRICS_PROXY_ENV] || env[NODE_METRICS_PROXY_ALIAS_ENV] || null;
+  return env[HISTORIAN_ENV]
+    || env[HISTORIAN_ALIAS_ENV]
+    || env[LEGACY_HISTORIAN_ENV]
+    || env[LEGACY_HISTORIAN_ALIAS_ENV]
+    || null;
 }
 
 function explicitNetwork(env) {
@@ -31,6 +37,7 @@ async function mappingCanisterIdForNetwork({ projectRoot, network, warnings }) {
 
   for (const file of mappingFiles) {
     const mapping = await readJsonIfExists(projectRoot, file, warnings);
+    if (typeof mapping?.nnx_historian === 'string' && mapping.nnx_historian) return mapping.nnx_historian;
     if (typeof mapping?.nnx_node_metrics_proxy === 'string' && mapping.nnx_node_metrics_proxy) {
       return mapping.nnx_node_metrics_proxy;
     }
@@ -50,7 +57,7 @@ export async function resolveFrontendEnv({
 
   return {
     env: {
-      [NODE_METRICS_PROXY_ENV]: canisterId,
+      [HISTORIAN_ENV]: canisterId,
     },
     warnings,
   };

@@ -2,11 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-  createNodeMetricsProxyClient,
+  createHistorianClient,
   idlFactory,
-} from '../src/data/node-health-metrics/node-metrics-proxy-client.js';
+} from '../src/data/node-health-metrics/historian-client.js';
 
-test('node metrics proxy IDL uses update method shape', () => {
+test('historian IDL uses update method shape', () => {
   const calls = [];
   const fakeIdl = {
     Principal: 'principal',
@@ -26,8 +26,8 @@ test('node metrics proxy IDL uses update method shape', () => {
   assert.equal(calls.length, 1);
 });
 
-test('node metrics proxy client normalizes actor response', async () => {
-  const client = createNodeMetricsProxyClient({
+test('historian client normalizes actor response', async () => {
+  const client = createHistorianClient({
     actor: {
       async get_node_metrics_history() {
         return {
@@ -58,20 +58,20 @@ test('node metrics proxy client normalizes actor response', async () => {
   assert.equal(result.records[0].numBlockFailuresTotal, 1n);
 });
 
-test('node metrics proxy client handles unavailable proxy', async () => {
-  const client = createNodeMetricsProxyClient();
+test('historian client handles unavailable historian', async () => {
+  const client = createHistorianClient();
   const result = await client.getNodeMetricsHistory({
     subnetId: '2vxsx-fae',
     startAtTimestampNanos: 1n,
     endAtTimestampNanos: 2n,
   });
   assert.equal(result.partial, true);
-  assert.equal(result.errors[0].code, 'NODE_METRICS_PROXY_NOT_CONFIGURED');
+  assert.equal(result.errors[0].code, 'HISTORIAN_NOT_CONFIGURED');
   assert.deepEqual(result.records, []);
 });
 
-test('node metrics proxy client preserves returned errors', async () => {
-  const client = createNodeMetricsProxyClient({
+test('historian client preserves returned errors', async () => {
+  const client = createHistorianClient({
     actor: {
       async get_node_metrics_history() {
         return {

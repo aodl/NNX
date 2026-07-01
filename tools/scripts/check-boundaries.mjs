@@ -7,7 +7,7 @@ const TEST_ROOT = 'canisters/frontend/web/test';
 const ALLOWED_PATH_PATTERNS = [
   /\/data\/query\//,
   /\/data\/topology\//,
-  /\/data\/node-health-metrics\/node-metrics-proxy-client\.js$/,
+  /\/data\/node-health-metrics\/historian-client\.js$/,
   /\/data\/topics\.js$/,
   /\/app\/config\.js$/,
   /\/main\.js$/,
@@ -19,7 +19,7 @@ const FORBIDDEN_IMPORT_PATTERNS = [
   { pattern: /@icp-sdk\/core\/principal/, reason: 'Principal internals' },
   { pattern: /raw-registry-client/, reason: 'raw Registry client' },
   { pattern: /protobuf|proto-decode|decode.*registry/i, reason: 'protobuf/raw decode internals' },
-  { pattern: /node_metrics_proxy.*did|node-metrics-proxy-client/, reason: 'node metrics proxy Candid/client boundary' },
+  { pattern: /historian.*did|historian-client/, reason: 'historian Candid/client boundary' },
 ];
 
 function walk(dir) {

@@ -14,7 +14,7 @@ node tools/scripts/check-frontend-artifacts.mjs
 node tools/scripts/check-boundaries.mjs
 tools/scripts/security-scan
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_test.wasm ./tools/scripts/icp-build-canister nnx-frontend nnx_frontend
-ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
+ICP_WASM_OUTPUT_PATH=/tmp/nnx_historian_test.wasm ./tools/scripts/icp-build-canister nnx-historian nnx_historian
 ```
 
 The committed project config remains `icp-cli`/`icp.yaml`. Do not add
@@ -26,13 +26,11 @@ Browser smoke is a manual release checklist item only. See
 dependencies or host OS browser packages.
 
 The historian/node metrics valid-path smoke is manual because local replicas may
-not support the experimental management-canister method. The source tree still
-uses the transitional `nnx_node_metrics_proxy` and `smoke:node-metrics-proxy`
-names until the historian source rename is complete:
+not support the experimental management-canister method:
 
 ```sh
-npm run smoke:node-metrics-proxy -- --network local --subnet-id <subnet-principal>
-npm run smoke:node-metrics-proxy -- --network ic --subnet-id <subnet-principal>
+npm run smoke:historian-node-metrics -- --network local --subnet-id <subnet-principal>
+npm run smoke:historian-node-metrics -- --network ic --subnet-id <subnet-principal>
 ```
 
 Certified API-boundary membership smoke uses only certified subnet state for

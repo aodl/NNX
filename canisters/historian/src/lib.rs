@@ -106,7 +106,7 @@ pub fn normalize_response(
     let errors = if partial {
         vec![NodeMetricsError {
             code: "RESPONSE_TRUNCATED".to_string(),
-            message: "node metrics response exceeded the proxy record limit.".to_string(),
+            message: "node metrics response exceeded the historian record limit.".to_string(),
         }]
     } else {
         vec![]
@@ -334,8 +334,8 @@ mod tests {
     }
 
     #[test]
-    fn candid_surface_marks_proxy_method_as_update() {
-        let did = include_str!("../node_metrics_proxy.did");
+    fn candid_surface_marks_historian_method_as_update() {
+        let did = include_str!("../historian.did");
         assert!(did.contains(
             "get_node_metrics_history : (NodeMetricsHistoryArgs) -> (NodeMetricsHistoryResponse);"
         ));

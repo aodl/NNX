@@ -2,7 +2,7 @@
 
 The frontend treats CSP as defense in depth only. Safe DOM construction,
 `textContent`, and URL sanitization are still required for all proposal,
-Registry, proxy, and historian-returned display fields.
+Registry, and historian-returned display fields.
 
 External URLs must be normalized through `safeExternalUrl` before rendering.
 Links that open a new tab use `target="_blank"` and `rel="noopener noreferrer"`.

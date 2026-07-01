@@ -8,8 +8,9 @@
     "build:frontend": "npm run generate:nns-topics && node canisters/frontend/web/build-frontend.mjs",
     "setup:frontend": "npm ci --no-fund --no-audit",
     "smoke:api-boundary-membership": "node tools/scripts/smoke-api-boundary-membership.mjs",
-    "smoke:node-metrics-proxy": "node tools/scripts/smoke-node-metrics-proxy.mjs",
+    "smoke:historian-node-metrics": "node tools/scripts/smoke-historian-node-metrics.mjs",
     "smoke:proposal-analysis:mainnet": "node tools/scripts/proposal-analysis-mainnet-smoke.mjs",
+    "review:deployed:mainnet": "node tools/scripts/review-deployed-mainnet.mjs",
     "test:frontend-unit": "node --test canisters/frontend/web/test/*.test.mjs"
   },
   "dependencies": {
