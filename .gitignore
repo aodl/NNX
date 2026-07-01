@@ -10,6 +10,10 @@
 # icp-cli local network/cache state
 .icp/cache/
 
+# dfx/local deployment state
+.dfx/
+canister_ids.json
+
 # Rust
 target/
 
@@ -24,6 +28,8 @@ dist/
 canisters/frontend/public/generated/*
 !canisters/frontend/public/generated/.gitkeep
 release-artifacts/
+review-output/
+.nnx-review-state/
 
 # Generated declarations are normally ignored, but checked-in frontend external declarations are kept.
 **/declarations/

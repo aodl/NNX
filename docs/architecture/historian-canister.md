@@ -1,7 +1,17 @@
 # Historian Canister
 
-The historian should exist only when NNX needs bounded historical or derived
-time-series data that system canisters do not already expose in a usable way.
+The historian currently exists in staging as a bounded
+`node_metrics_history` access canister. It does not yet persist durable
+historical records. Any future sampling/storage must be bounded, paged,
+provenance-rich, and tested.
+
+The source tree still contains the transitional `nnx_node_metrics_proxy`
+package/canister name. Treat `nnx_historian` as the durable canister name for
+deployment policy and new documentation until the source rename is completed.
+
+The historian should store data only when NNX needs bounded historical or
+derived time-series data that system canisters do not already expose in a usable
+way.
 
 Good future candidates:
 
@@ -52,13 +62,10 @@ type HistorianQuery = record {
 };
 ```
 
-The historian is downstream from system canisters and from bounded proxies such
-as `nnx_node_metrics_proxy`; it is not a substitute for them and should not mirror
-their current state. Tests should cover retention pruning, pagination,
-provenance, stable-memory upgrade compatibility, partial-data records, and API
-bounds.
-
-No historian canister is implemented now.
+The historian is downstream from system canisters. It is not a dashboard API
+mirror and should not mirror unbounded current state. Tests should cover
+retention pruning, pagination, provenance, stable-memory upgrade compatibility,
+partial-data records, and API bounds.
 
 ## Candidate-node analysis note
 

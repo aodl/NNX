@@ -17,12 +17,18 @@ ICP_WASM_OUTPUT_PATH=/tmp/nnx_frontend_test.wasm ./tools/scripts/icp-build-canis
 ICP_WASM_OUTPUT_PATH=/tmp/nnx_node_metrics_proxy_test.wasm ./tools/scripts/icp-build-canister nnx-node-metrics-proxy nnx_node_metrics_proxy
 ```
 
+The committed project config remains `icp-cli`/`icp.yaml`. Do not add
+`dfx.json`. `dfx` may be used only as an operator tool for staging upgrades as
+described in `docs/staging-deploy.md`.
+
 Browser smoke is a manual release checklist item only. See
 `docs/testing/browser-smoke.md`; it does not require npm browser automation
 dependencies or host OS browser packages.
 
-The node metrics proxy valid-path smoke is manual because local replicas may not
-support the experimental management-canister method:
+The historian/node metrics valid-path smoke is manual because local replicas may
+not support the experimental management-canister method. The source tree still
+uses the transitional `nnx_node_metrics_proxy` and `smoke:node-metrics-proxy`
+names until the historian source rename is complete:
 
 ```sh
 npm run smoke:node-metrics-proxy -- --network local --subnet-id <subnet-principal>
@@ -58,8 +64,8 @@ Verify:
 - `node tools/scripts/check-boundaries.mjs`
 - `tools/scripts/security-scan`
 - generated `/generated/frontend-env.json` contains the deployed
-  `nnx_node_metrics_proxy` ID for the active network, or `null` when no network
-  or explicit env var was selected during a standalone frontend build
+  historian/node metrics canister ID for the active network, or `null` when no
+  network or explicit env var was selected during a standalone frontend build
 
 Manual browser smoke:
 
@@ -84,4 +90,6 @@ Manual browser smoke:
     - `/neuron/not-a-number` -> 404
 16. Check browser console manually for unexpected errors.
 
-Deploy with the repo's `icp-cli` flow. Do not add `dfx.json` or switch to `dfx`.
+Deploy normal project builds with the repo's `icp-cli` flow. Staging upgrades may
+use `dfx` only as an operator tool against the permanent staging canisters in
+`docs/staging-deploy.md`.

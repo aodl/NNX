@@ -1,7 +1,8 @@
 # Node Metrics Proxy
 
-`nnx_node_metrics_proxy` is a separate Rust canister from `nnx_frontend`.
-`nnx_frontend` remains a certified static asset canister only.
+`nnx_node_metrics_proxy` is the current source/package name for the separate
+Rust canister that should become `nnx_historian`. `nnx_frontend` remains a
+certified static asset canister only.
 
 The proxy exposes one browser-callable NNX update method:
 
@@ -100,4 +101,7 @@ icp deploy
 npm run smoke:node-metrics-proxy -- --network local --subnet-id <subnet-principal>
 ```
 
-Do not use `dfx`. Do not add application data APIs to `nnx_frontend`.
+Normal repo builds and local deploys use `icp-cli`/`icp.yaml`. Do not add
+`dfx.json`. `dfx` is allowed only as an operator tool for explicit staging
+upgrades documented in `docs/staging-deploy.md`. Do not add application data
+APIs to `nnx_frontend`.

@@ -10,7 +10,9 @@ Supported Phase 1 proposal action types are subnet membership changes, subnet cr
 
 ## Tooling
 
-This repository uses `icp-cli` and `icp.yaml`. It does not use `dfx` or `dfx.json`.
+This repository uses `icp-cli` and `icp.yaml` as committed project config. Do
+not add `dfx.json`; `dfx` is allowed only as an operator tool for explicit
+staging upgrades documented in `docs/staging-deploy.md`.
 
 Install `icp-cli` and the Rust Wasm target before deploying:
 
