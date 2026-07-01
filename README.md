@@ -4,7 +4,13 @@
 
 Network Nexus (NNX) is a first prototype of an NNS-governance-focused onchain dashboard for the Internet Computer.
 
-The initial scope is intentionally small: `/` lists open NNS proposals that can still be voted on and groups IC subnets by node count, `/subnet/{subnet_id}` shows Registry-derived subnet details and node locations, while `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID. The browser app queries NNS Governance, Registry, and CMC through the query facade.
+The initial scope is intentionally small: `/` is a governance command center for
+open NNS proposals, subnet evidence, and tokenomics signals;
+`/tokenomics` shows historian-backed NNS Governance tokenomics snapshots;
+`/subnet/{subnet_id}` shows Registry-derived subnet details and node locations;
+and `/neuron/{neuron_id}` shows details for a decimal `nat64` NNS neuron ID.
+The browser app queries NNS Governance, Registry, CMC, and the NNX historian
+through the query facade.
 
 NNX proposal analysis uses only onchain/system-canister data available through the query facade: NNS Governance, NNS Registry, CMC, and normalized raw Registry reads. The analysis layer is lifecycle-aware, so pending proposals get precondition checks while successfully executed proposals get postcondition checks.
 
@@ -42,12 +48,24 @@ icp network start -d
 
 ```text
 /                         open NNS proposals
+/tokenomics               historian-backed tokenomics metrics
 /neuron/{neuron_id}
 /proposal/{proposal_id}   NNS proposal detail
 /subnet/{subnet_id}       IC subnet detail and node map
 ```
 
 The landing page reads NNS Governance `list_proposals` filtered to `PROPOSAL_REWARD_STATUS_ACCEPT_VOTES` as the source of truth for proposals still accepting votes, Registry subnet records as the source of truth for subnet membership/node counts, and CMC subnet type assignments for placement labels such as `Fiduciary`. Malformed routes are handled by the Rust certified asset canister as HTTP 404. Valid-shaped but non-existent neuron IDs are detected client-side after querying NNS Governance.
+
+NNX has a CSS-variable dark/light theme system. First load follows system
+preference, explicit toggles are persisted when localStorage is available, and
+the UI degrades to a readable default when storage is unavailable.
+
+Tokenomics metrics are historian-backed. Governance cached metrics are the
+source for maturity, staked ICP, locked ICP, supply, and dissolve-delay bucket
+snapshots. Dissolve-delay bands use half-year Governance buckets and must be
+labeled as approximate near boundaries. ICP burned is shown only when it can be
+derived from allowed ledger/system canister sources; Dashboard APIs are not data
+sources.
 
 ## Query Architecture
 

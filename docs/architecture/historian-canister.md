@@ -1,15 +1,29 @@
 # Historian Canister
 
 The historian is a separate canister for bounded `node_metrics_history` access
-and future bounded historical sampling. It
-does not yet persist durable historical records. Future periodic sampling must
-be bounded, paged, provenance-rich, and tested before being enabled.
+and bounded historical sampling. It stores tokenomics snapshots in stable memory
+with explicit retention and provenance. Future periodic sampling must be
+bounded, paged, provenance-rich, and tested before being enabled.
 
 The public method is intentionally an update method:
 
 ```candid
 get_node_metrics_history : (NodeMetricsHistoryArgs) -> (NodeMetricsHistoryResponse);
 ```
+
+Tokenomics methods:
+
+```candid
+sample_tokenomics_snapshot : () -> (SampleTokenomicsSnapshotResponse);
+get_latest_tokenomics_snapshot : () -> (opt TokenomicsSnapshot) query;
+list_tokenomics_snapshots : (TokenomicsSnapshotQuery) -> (TokenomicsSnapshotPage) query;
+```
+
+`sample_tokenomics_snapshot` is manual only. No automatic timer is enabled yet.
+It samples NNS Governance `get_metrics` and best-effort
+`get_latest_reward_event`, stores at most one snapshot per week, and keeps a
+five-year weekly retention window of 260 samples. Query pages are capped at 104
+samples.
 
 The IC management canister `node_metrics_history` method is canister-only and
 experimental. The historian calls the management canister with the official
@@ -45,6 +59,19 @@ only as one-release compatibility fallbacks.
 The historian should store data only when NNX needs bounded historical or
 derived time-series data that system canisters do not already expose in a usable
 way.
+
+Tokenomics snapshot source policy:
+
+- maturity, staked maturity, total staked ICP, total locked ICP, total supply,
+  and dissolve-delay bucket inputs come from NNS Governance cached metrics
+- dissolve-delay buckets are half-year buckets; UI copy must not imply day-level
+  precision
+- below-voting-threshold stake uses
+  `neurons_with_less_than_6_months_dissolve_delay_e8s`
+- ICP burned is unavailable until a bounded scanner can derive it from ICP
+  Ledger/index/archive or another allowed system canister source
+- Dashboard APIs, `ic-api.internetcomputer.org`, CSV snapshots, scraping, and
+  offchain indexers must not be used
 
 Good future candidates:
 

@@ -17,6 +17,11 @@ Permanent IC staging canisters:
 Codex may upgrade these staging canisters with `dfx` using the `codex_local`
 identity, following `docs/staging-deploy.md`.
 
+After historian upgrades that add tokenomics code, staging operators may run one
+manual `sample_tokenomics_snapshot` call against
+`yo47z-piaaa-aaaac-qg3xa-cai`. This is an operator action only; automatic
+weekly sampling is not enabled.
+
 ## Production
 
 Production canisters are explicit placeholders for now:

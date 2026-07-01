@@ -14,6 +14,17 @@ agents, generated Candid declarations, raw Registry key modules, protobuf decode
 helpers, Principal internals, management-canister callers, or historian Candid
 clients directly.
 
+Tokenomics UI follows the same boundary:
+
+```text
+UI -> tokenomics-service -> queryFacade.getLatestTokenomicsSnapshot/listTokenomicsSnapshots
+   -> historian boundary client
+```
+
+The tokenomics service normalizes historian snapshots, formats e8s values, and
+prepares chart series. UI modules must not import historian Candid or actor
+bindings directly.
+
 Narrowly allowed boundary zones:
 
 - `canisters/frontend/web/src/data/query/`

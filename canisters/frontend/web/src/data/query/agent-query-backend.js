@@ -283,6 +283,8 @@ export async function createAgentQueryBackend({
     getIcSubnetNodeCounts: topologyService.getIcSubnetNodeCounts,
     getIcTopology: topologyService.getIcTopology,
     getNodeMetricsHistory: historianClient.getNodeMetricsHistory,
+    getLatestTokenomicsSnapshot: historianClient.getLatestTokenomicsSnapshot,
+    listTokenomicsSnapshots: historianClient.listTokenomicsSnapshots,
     getApiBoundaryNodeIds,
     getCmcSubnetLabels,
     refreshIcTopology: topologyService.refreshIcTopology,

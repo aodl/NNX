@@ -1,11 +1,32 @@
 :root {
   color-scheme: light;
-  --bg: #f6f7f9;
-  --panel: #ffffff;
-  --text: #17202a;
-  --muted: #5d6b78;
-  --line: #d8dee6;
-  --accent: #0f766e;
+  --background: #f5f8fc;
+  --surface: #ffffff;
+  --surface-elevated: #fafdff;
+  --card-surface: rgba(255, 255, 255, 0.92);
+  --border: #d9e2ec;
+  --text-primary: #101923;
+  --text-secondary: #445466;
+  --text-muted: #667789;
+  --accent-cyan: #0891b2;
+  --accent-purple: #7c3aed;
+  --accent-orange: #ea580c;
+  --brand-gradient: linear-gradient(135deg, #06b6d4, #7c3aed 52%, #f97316);
+  --success: #15803d;
+  --warning-token: #b45309;
+  --critical: #be123c;
+  --manual-review: #6d28d9;
+  --info: #2563eb;
+  --focus-ring: #0891b2;
+  --chart-grid: #dbe7f1;
+  --chart-line: #0891b2;
+  --shadow: 0 18px 45px rgba(25, 43, 64, 0.13);
+  --bg: var(--background);
+  --panel: var(--surface);
+  --text: var(--text-primary);
+  --muted: var(--text-secondary);
+  --line: var(--border);
+  --accent: var(--accent-cyan);
   --accent-soft: #d9f1ee;
   --yes: #22c55e;
   --no: #ef4444;
@@ -16,16 +37,60 @@
   --neutral-bar: #eef2f6;
 }
 
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #071018;
+  --surface: #0d1a25;
+  --surface-elevated: #122333;
+  --card-surface: rgba(15, 29, 42, 0.82);
+  --border: rgba(146, 180, 205, 0.22);
+  --text-primary: #edf7ff;
+  --text-secondary: #b9c8d6;
+  --text-muted: #8fa3b5;
+  --accent-cyan: #22d3ee;
+  --accent-purple: #a78bfa;
+  --accent-orange: #fb923c;
+  --brand-gradient: linear-gradient(135deg, #22d3ee, #a78bfa 52%, #fb923c);
+  --success: #4ade80;
+  --warning-token: #fbbf24;
+  --critical: #fb7185;
+  --manual-review: #c4b5fd;
+  --info: #60a5fa;
+  --focus-ring: #67e8f9;
+  --chart-grid: rgba(148, 163, 184, 0.22);
+  --chart-line: #22d3ee;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  --accent-soft: rgba(34, 211, 238, 0.14);
+  --neutral-bar: rgba(148, 163, 184, 0.18);
+}
+
 * {
   box-sizing: border-box;
 }
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--accent-cyan) 20%, transparent), transparent 30rem),
+    radial-gradient(circle at 82% 0%, color-mix(in srgb, var(--accent-orange) 16%, transparent), transparent 28rem),
+    var(--bg);
   color: var(--text);
   font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   line-height: 1.5;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .metric-card,
+  .proposal-card,
+  .subnet-row,
+  .app-nav a {
+    transition: border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease, background 160ms ease;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 a {
@@ -36,6 +101,153 @@ a {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
   padding: 32px 0 48px;
+}
+
+.app-root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  width: min(1500px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 18px 0 48px;
+}
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(18px);
+}
+
+.app-brand,
+.app-nav,
+.app-tools,
+.hero-chip-row,
+.metric-footer,
+.provenance-list {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-brand {
+  min-width: 0;
+  color: var(--text-primary);
+  text-decoration: none;
+}
+
+.nnx-logo-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--accent-cyan);
+}
+
+.nnx-logo-mark svg {
+  width: 100%;
+  height: 100%;
+}
+
+.app-brand-text {
+  display: grid;
+  gap: 2px;
+}
+
+.environment-badge,
+.build-badge,
+.hero-build-chip,
+.freshness-badge,
+.source-badge,
+.metric-source,
+.delta-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--surface-elevated) 84%, transparent);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.app-nav {
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.app-nav a {
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.app-nav a.active,
+.app-nav a:hover {
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.app-tools {
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.shell-search {
+  position: relative;
+  min-width: min(320px, 32vw);
+}
+
+.shell-search input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+.shell-search-hint {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  max-width: 280px;
+  color: var(--warning-token);
+  font-size: 0.78rem;
+}
+
+.theme-toggle {
+  min-height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.app-content {
+  padding-top: 22px;
 }
 
 .shell.detail-shell {
@@ -112,9 +324,10 @@ h2 {
 .subnet-panel,
 .subnet-summary-panel,
 .proposal-card {
-  background: var(--panel);
-  border: 1px solid var(--line);
+  background: var(--card-surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
 .button {
@@ -166,6 +379,184 @@ h2 {
   justify-content: end;
   gap: 16px;
   margin-top: 24px;
+}
+
+.command-shell {
+  width: 100%;
+  padding-top: 0;
+}
+
+.command-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  align-items: end;
+  padding: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background:
+    linear-gradient(var(--card-surface), var(--card-surface)) padding-box,
+    var(--brand-gradient) border-box;
+  box-shadow: var(--shadow);
+}
+
+.command-hero h1 {
+  max-width: 780px;
+  margin-top: 0;
+}
+
+.hero-chip-row {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.metric-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-surface);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.metric-card.featured {
+  background:
+    linear-gradient(var(--card-surface), var(--card-surface)) padding-box,
+    var(--brand-gradient) border-box;
+  border-color: transparent;
+}
+
+.metric-card:hover,
+.proposal-card:hover,
+.subnet-row:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.metric-label {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.metric-value {
+  color: var(--text-primary);
+  font-size: 1.45rem;
+  line-height: 1.1;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.metric-detail,
+.metric-state {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.metric-state {
+  display: grid;
+  gap: 3px;
+}
+
+.loading-skeleton {
+  color: var(--text-muted);
+}
+
+.command-layout {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 390px);
+  align-items: start;
+}
+
+.dashboard-main,
+.dashboard-side {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-surface);
+}
+
+.dashboard-panel h2 {
+  margin-top: 0;
+}
+
+.panel-link {
+  display: inline-flex;
+  width: fit-content;
+  margin: 10px 10px 0 0;
+  color: var(--accent-cyan);
+  font-weight: 800;
+}
+
+.review-link {
+  margin: 0 0 12px;
+}
+
+.sparkline {
+  width: 100%;
+  height: 54px;
+  margin-top: 12px;
+}
+
+.sparkline-line,
+.sparkline-empty {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sparkline-empty {
+  stroke: var(--chart-grid);
+}
+
+.sparkline-area {
+  fill: color-mix(in srgb, var(--chart-line) 18%, transparent);
+}
+
+.stacked-bar {
+  display: flex;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--neutral-bar);
+}
+
+.stacked-bar-segment.success { background: var(--success); }
+.stacked-bar-segment.warning { background: var(--warning-token); }
+.stacked-bar-segment.critical { background: var(--critical); }
+.stacked-bar-segment.manual { background: var(--manual-review); }
+.stacked-bar-segment.info { background: var(--info); }
+
+.source-badge small {
+  color: var(--text-muted);
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.methodology-panel li {
+  margin-bottom: 8px;
+  color: var(--text-secondary);
 }
 
 .proposal-panel,
@@ -2463,6 +2854,32 @@ tr:last-child td {
 }
 
 @media (max-width: 820px) {
+  .app-header {
+    position: static;
+    grid-template-columns: 1fr;
+  }
+
+  .app-nav,
+  .app-tools,
+  .hero-chip-row {
+    justify-content: flex-start;
+  }
+
+  .shell-search {
+    min-width: 100%;
+    width: 100%;
+  }
+
+  .command-hero {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+
+  .metric-grid,
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+
   .home-layout {
     grid-template-columns: minmax(0, 1fr);
     justify-content: stretch;

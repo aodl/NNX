@@ -11,10 +11,13 @@ test('historian IDL uses update method shape', () => {
   const fakeIdl = {
     Principal: 'principal',
     Nat64: 'nat64',
+    Nat32: 'nat32',
+    Nat8: 'nat8',
     Text: 'text',
     Bool: 'bool',
     Record: (fields) => ({ kind: 'record', fields }),
     Vec: (value) => ({ kind: 'vec', value }),
+    Opt: (value) => ({ kind: 'opt', value }),
     Func: (args, results, annotations) => {
       calls.push({ args, results, annotations });
       return { kind: 'func', args, results, annotations };
@@ -23,7 +26,10 @@ test('historian IDL uses update method shape', () => {
   };
   const service = idlFactory({ IDL: fakeIdl });
   assert.deepEqual(service.methods.get_node_metrics_history.annotations, []);
-  assert.equal(calls.length, 1);
+  assert.deepEqual(service.methods.get_latest_tokenomics_snapshot.annotations, ['query']);
+  assert.deepEqual(service.methods.list_tokenomics_snapshots.annotations, ['query']);
+  assert.deepEqual(service.methods.sample_tokenomics_snapshot.annotations, []);
+  assert.equal(calls.length, 4);
 });
 
 test('historian client normalizes actor response', async () => {

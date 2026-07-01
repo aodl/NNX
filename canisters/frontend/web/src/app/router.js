@@ -19,6 +19,10 @@ export function parseRoute(pathname) {
     return { kind: 'data_sources' };
   }
 
+  if (pathname === '/tokenomics') {
+    return { kind: 'tokenomics' };
+  }
+
   const parts = pathname.split('/').filter(Boolean);
   if (parts.length !== 2 || !['neuron', 'proposal', 'subnet'].includes(parts[0])) {
     return { kind: 'not_found' };

@@ -4,6 +4,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Network Nexus</title>
+    <script>
+      (() => {
+        try {
+          const stored = localStorage.getItem('nnx.theme');
+          const theme = stored === 'light' || stored === 'dark'
+            ? stored
+            : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.dataset.theme = theme;
+          document.documentElement.style.colorScheme = theme;
+        } catch {
+          document.documentElement.dataset.theme = 'light';
+          document.documentElement.style.colorScheme = 'light';
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/base.css">
   </head>
   <body>

@@ -28,6 +28,11 @@ test('data sources route', () => {
   assert.deepEqual(parseRoute('/data-sources/extra'), { kind: 'not_found' });
 });
 
+test('tokenomics route', () => {
+  assert.deepEqual(parseRoute('/tokenomics'), { kind: 'tokenomics' });
+  assert.deepEqual(parseRoute('/tokenomics/extra'), { kind: 'not_found' });
+});
+
 for (const path of [
   '/neuron/',
   '/neuron/abc',

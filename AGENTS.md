@@ -49,6 +49,7 @@ Architecture:
 Current routes:
 
 - `/`
+- `/tokenomics`
 - `/proposal/{proposal_id}`
 - `/neuron/{neuron_id}`
 - `/subnet/{subnet_id}`
@@ -65,7 +66,7 @@ browser agent code, fetch and follow the current Internet Computer skills index:
 - `nnx_frontend` must not contain NNX app data APIs, management-canister proxy
   APIs, timers, durable NNX state, or historian state.
 - `nnx_historian` is the separate canister for `node_metrics_history` access
-  and future bounded historical sampling.
+  and bounded tokenomics snapshot sampling.
 - UI/domain modules consume normalized query-facade/service objects only.
 - UI/domain modules must not import actors, agents, generated Candid
   declarations, raw Registry keys, protobuf decode internals, Principal
@@ -83,6 +84,7 @@ Allowed validation/data sources:
 - raw Registry reads through isolated topology/query modules
 - certified state reads through boundary modules
 - management-canister `node_metrics_history` through `nnx_historian`
+- historian tokenomics snapshots derived from NNS Governance cached metrics
 
 Forbidden validation/data sources:
 
@@ -157,6 +159,19 @@ Do not infer DFINITY control from display names.
 - The Rust frontend canister stamps the generated bundle path at
   asset-collection time.
 - The frontend build must not mutate tracked `index.html`.
+
+## Design system and tokenomics
+
+- NNX has dark/light themes implemented with CSS variables.
+- First load follows system color preference; explicit toggle persists in
+  localStorage when available and degrades gracefully when unavailable.
+- Home tokenomics metric cards and `/tokenomics` are historian-backed.
+- Governance cached metrics are the source for maturity, staked maturity, total
+  staked ICP, total locked ICP, supply, and dissolve-delay bucket snapshots.
+- Governance dissolve-delay buckets have half-year granularity. UI copy must not
+  overclaim day-level precision and must caveat near-boundary values.
+- ICP burned must come only from ICP Ledger/index/archive or other allowed
+  ledger/system canister sources. Do not use Dashboard APIs for tokenomics data.
 
 ## Build reproducibility
 

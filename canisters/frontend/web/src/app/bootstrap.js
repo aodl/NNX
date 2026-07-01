@@ -12,6 +12,10 @@ import { renderProposalPage } from '../ui/proposal-page.js';
 import { renderReviewPage } from '../ui/review-page.js';
 import { renderSubnetPage } from '../ui/subnet-page.js';
 import { renderDataSourcesPage } from '../ui/data-sources-page.js';
+import { renderTokenomicsPage } from '../ui/tokenomics-page.js';
+import { renderAppShell } from '../ui/app-shell.js';
+import { initializeTheme } from '../ui/theme.js';
+import { createTokenomicsService } from '../data/tokenomics/tokenomics-service.js';
 
 async function createQueryFacade(windowRef) {
   const hostname = windowRef.location.hostname;
@@ -22,6 +26,7 @@ async function createQueryFacade(windowRef) {
 }
 
 export async function bootstrap({ windowRef = window, documentRef = document } = {}) {
+  initializeTheme({ documentRef });
   const root = documentRef.getElementById('app');
   if (!root) throw new Error('Missing #app root element');
 
@@ -32,6 +37,7 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
   }
 
   const queryFacade = await createQueryFacade(windowRef);
+  const contentRoot = renderAppShell(root, { route, windowRef, documentRef });
   const analysisService = createProposalAnalysisService({ queryFacade });
   const analysisFacade = Object.freeze({
     ...queryFacade,
@@ -44,35 +50,42 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
   if (route.kind === 'home') {
     const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
-    await renderHomePage(root, { proposalLoader, subnetLoader });
+    const tokenomicsService = createTokenomicsService({ queryFacade });
+    await renderHomePage(contentRoot, { proposalLoader, subnetLoader, tokenomicsService });
     return;
   }
 
   if (route.kind === 'proposal') {
     const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
-    await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader, subnetLoader });
+    await renderProposalPage(contentRoot, { proposalId: route.proposalId, proposalLoader, subnetLoader });
     return;
   }
 
   if (route.kind === 'review') {
     const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
-    await renderReviewPage(root, { proposalLoader });
+    await renderReviewPage(contentRoot, { proposalLoader });
     return;
   }
 
   if (route.kind === 'data_sources') {
-    await renderDataSourcesPage(root);
+    await renderDataSourcesPage(contentRoot);
+    return;
+  }
+
+  if (route.kind === 'tokenomics') {
+    const tokenomicsService = createTokenomicsService({ queryFacade });
+    await renderTokenomicsPage(contentRoot, { tokenomicsService });
     return;
   }
 
   if (route.kind === 'subnet') {
     const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
-    await renderSubnetPage(root, { subnetId: route.subnetId, subnetLoader, proposalLoader });
+    await renderSubnetPage(contentRoot, { subnetId: route.subnetId, subnetLoader, proposalLoader });
     return;
   }
 
   const neuronLoader = createNeuronLoader({ queryFacade });
-  await renderNeuronPage(root, { neuronId: route.neuronId, neuronLoader });
+  await renderNeuronPage(contentRoot, { neuronId: route.neuronId, neuronLoader });
 }

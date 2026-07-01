@@ -1,12 +1,16 @@
 import { annotateSubnetsWithProposalImpacts } from '../data/proposal-subnet-impacts.js';
 import { renderProposalPanel } from './proposal-list-panel.js';
 import { capitalizeFirstLetter, formatSubnetType } from './subnet-formatters.js';
+import { createSparkline, createStackedBar } from './charts.js';
+import { createMetricCard } from './metric-card.js';
+import { createSourceBadge } from './provenance-badge.js';
+import { formatIcpE8s } from '../data/tokenomics/tokenomics-service.js';
 
 const PROPOSAL_AUTO_REFRESH_MS = 5 * 60 * 1000;
 
 function clear(root) {
-  root.className = 'shell';
-  root.innerHTML = '';
+  root.className = 'shell command-shell';
+  root.textContent = '';
 }
 
 function clearRefreshTimer(root) {
@@ -16,27 +20,30 @@ function clearRefreshTimer(root) {
   }
 }
 
-function renderHeader() {
-  const header = document.createElement('header');
-  header.className = 'home-header';
-
-  const logo = document.createElement('img');
-  logo.className = 'home-logo';
-  logo.src = '/logo.svg';
-  logo.alt = 'Network Nexus logo';
-  logo.width = 96;
-  logo.height = 96;
-
+function renderHeader({ buildInfo = null } = {}) {
+  const header = document.createElement('section');
+  header.className = 'command-hero';
   const copy = document.createElement('div');
-  copy.className = 'home-header-copy';
   const title = document.createElement('h1');
-  title.textContent = 'NETWORK NEXUS';
+  title.textContent = 'Governance command center';
   const subtitle = document.createElement('p');
   subtitle.className = 'subtitle';
-  subtitle.textContent = 'Optimizing NNS governance and tokenomics';
+  subtitle.textContent = 'Onchain NNS proposal intelligence, subnet evidence, and tokenomics signals.';
+  const chip = document.createElement('span');
+  chip.className = 'hero-build-chip';
+  const commit = buildInfo?.gitCommit ? String(buildInfo.gitCommit).slice(0, 7) : 'unknown';
+  chip.textContent = `Staging · commit ${commit}`;
   copy.append(title, subtitle);
+  const badges = document.createElement('div');
+  badges.className = 'hero-chip-row';
+  badges.append(
+    createSourceBadge('NNS Governance'),
+    createSourceBadge('NNS Registry'),
+    createSourceBadge('Historian'),
+    chip,
+  );
 
-  header.append(logo, copy);
+  header.append(copy, badges);
   return header;
 }
 
@@ -121,6 +128,157 @@ function renderNotice(title, message, retry = null) {
     section.append(button('Retry', retry));
   }
   return section;
+}
+
+async function loadBuildInfo() {
+  try {
+    const response = await fetch('/generated/build-info.json', { cache: 'no-store' });
+    return response.ok ? await response.json() : null;
+  } catch {
+    return null;
+  }
+}
+
+function summarizeReadiness(proposals = []) {
+  const counts = {
+    open: proposals.length,
+    reviewReady: 0,
+    manualReview: 0,
+    unsupported: 0,
+    bugSuspected: 0,
+  };
+  for (const proposal of proposals) {
+    const readiness = proposal.voteReadiness ?? proposal.analysis?.voteReadiness ?? '';
+    if (readiness === 'ready') counts.reviewReady += 1;
+    if (readiness === 'needs_manual_review') counts.manualReview += 1;
+    if (readiness === 'unsupported') counts.unsupported += 1;
+    if (readiness === 'bug_suspected') counts.bugSuspected += 1;
+  }
+  return counts;
+}
+
+function renderHeroMetrics({ proposals, tokenomics }) {
+  const counts = summarizeReadiness(proposals);
+  const latest = tokenomics?.latest ?? null;
+  const grid = document.createElement('section');
+  grid.className = 'metric-grid hero-metrics';
+  const unavailable = 'Historian tokenomics sampling not initialized.';
+  grid.append(
+    createMetricCard({
+      label: 'Undisbursed voting rewards',
+      value: latest ? formatIcpE8s(latest.totalMaturityE8sEquivalent) : null,
+      state: latest ? 'value' : 'unavailable',
+      detail: latest ? 'Maturity in neurons' : unavailable,
+      source: 'NNS Governance',
+      chart: createSparkline((tokenomics?.series?.maturity ?? []).map((point) => point.value)),
+      featured: true,
+    }),
+    createMetricCard({
+      label: 'Total staked ICP',
+      value: latest ? formatIcpE8s(latest.totalStakedE8s) : null,
+      state: latest ? 'value' : 'unavailable',
+      detail: latest ? 'Cached Governance metric' : unavailable,
+      source: 'NNS Governance',
+      chart: createSparkline((tokenomics?.series?.staked ?? []).map((point) => point.value)),
+      featured: true,
+    }),
+    createMetricCard({
+      label: 'ICP burned this week',
+      value: latest?.icpBurnedWeekDeltaE8s !== null && latest?.icpBurnedWeekDeltaE8s !== undefined
+        ? formatIcpE8s(latest.icpBurnedWeekDeltaE8s)
+        : null,
+      state: latest?.icpBurnedWeekDeltaE8s !== null && latest?.icpBurnedWeekDeltaE8s !== undefined
+        ? 'value'
+        : 'unavailable',
+      detail: latest?.icpBurnedWeekDeltaE8s !== null && latest?.icpBurnedWeekDeltaE8s !== undefined
+        ? 'Allowed ledger/system source'
+        : 'Ledger burn scanner not initialized.',
+      source: 'ICP Ledger',
+      chart: createSparkline((tokenomics?.series?.burned ?? []).map((point) => point.value)),
+      featured: true,
+    }),
+    createMetricCard({ label: 'Open proposals', value: String(counts.open), source: 'NNS Governance' }),
+    createMetricCard({ label: 'Review-ready', value: String(counts.reviewReady), source: 'NNX analysis' }),
+    createMetricCard({ label: 'Needs manual review', value: String(counts.manualReview), source: 'NNX analysis' }),
+    createMetricCard({ label: 'Unsupported', value: String(counts.unsupported), source: 'NNX analysis' }),
+    createMetricCard({ label: 'Bug suspected', value: String(counts.bugSuspected), source: 'NNX analysis' }),
+  );
+  return grid;
+}
+
+function renderSidePanels({ proposals, subnetPanelData, tokenomics }) {
+  const aside = document.createElement('aside');
+  aside.className = 'dashboard-side';
+  const tokenomicsPanel = document.createElement('section');
+  tokenomicsPanel.className = 'dashboard-panel';
+  const tokenomicsTitle = document.createElement('h2');
+  tokenomicsTitle.textContent = 'Tokenomics signals';
+  tokenomicsPanel.append(tokenomicsTitle);
+  if (tokenomics?.latest) {
+    tokenomicsPanel.append(
+      createMetricCard({
+        label: 'Maturity in neurons',
+        value: formatIcpE8s(tokenomics.latest.totalMaturityE8sEquivalent),
+        source: 'Historian',
+      }),
+    );
+  } else {
+    tokenomicsPanel.append(createMetricCard({
+      label: 'Historian tokenomics',
+      state: 'unavailable',
+      detail: 'Historian tokenomics sampling not initialized.',
+      source: 'Historian',
+    }));
+  }
+  const tokenomicsLink = document.createElement('a');
+  tokenomicsLink.className = 'panel-link';
+  tokenomicsLink.href = '/tokenomics';
+  tokenomicsLink.textContent = 'Open tokenomics';
+  tokenomicsPanel.append(tokenomicsLink);
+
+  const signalPanel = document.createElement('section');
+  signalPanel.className = 'dashboard-panel';
+  const signalTitle = document.createElement('h2');
+  signalTitle.textContent = 'Subnet signals';
+  const signalCopy = document.createElement('p');
+  signalCopy.className = 'muted';
+  signalCopy.textContent = `${subnetPanelData.subnets.length} subnets grouped by node count. Derived node measurements use signal labels only.`;
+  signalPanel.append(signalTitle, signalCopy);
+
+  const unsupportedPanel = document.createElement('section');
+  unsupportedPanel.className = 'dashboard-panel';
+  const unsupportedTitle = document.createElement('h2');
+  unsupportedTitle.textContent = 'Unsupported action backlog';
+  const unsupportedCount = summarizeReadiness(proposals).unsupported;
+  const unsupportedCopy = document.createElement('p');
+  unsupportedCopy.className = 'muted';
+  unsupportedCopy.textContent = unsupportedCount > 0
+    ? `${unsupportedCount} current proposal${unsupportedCount === 1 ? '' : 's'} need analyzer support.`
+    : 'No unsupported current proposals in this sample.';
+  const reviewLink = document.createElement('a');
+  reviewLink.className = 'panel-link';
+  reviewLink.href = '/review';
+  reviewLink.textContent = 'Open review queue';
+  const dataLink = document.createElement('a');
+  dataLink.className = 'panel-link';
+  dataLink.href = '/data-sources';
+  dataLink.textContent = 'Open data sources';
+  unsupportedPanel.append(unsupportedTitle, unsupportedCopy, reviewLink, dataLink);
+
+  const readinessPanel = document.createElement('section');
+  readinessPanel.className = 'dashboard-panel';
+  const readinessTitle = document.createElement('h2');
+  readinessTitle.textContent = 'Readiness breakdown';
+  const counts = summarizeReadiness(proposals);
+  readinessPanel.append(readinessTitle, createStackedBar([
+    { label: 'Review-ready', value: counts.reviewReady, tone: 'success' },
+    { label: 'Manual review', value: counts.manualReview, tone: 'manual' },
+    { label: 'Unsupported', value: counts.unsupported, tone: 'warning' },
+    { label: 'Bug suspected', value: counts.bugSuspected, tone: 'critical' },
+  ]));
+
+  aside.append(tokenomicsPanel, readinessPanel, signalPanel, unsupportedPanel);
+  return aside;
 }
 
 export function summarizeSubnetKinds(subnets) {
@@ -269,25 +427,31 @@ function renderSubnetRow(subnet) {
   return row;
 }
 
-export async function renderHomePage(root, { proposalLoader, subnetLoader }) {
+export async function renderHomePage(root, { proposalLoader, subnetLoader, tokenomicsService = null }) {
   clearRefreshTimer(root);
 
   async function load() {
     clearRefreshTimer(root);
 
     clear(root);
-    root.append(renderHeader(), renderNotice('Loading proposals accepting votes', ''));
+    root.append(renderNotice('Loading governance command center', ''));
 
     let proposals;
     let subnetPanelData = { groups: [], subnets: [], warnings: [], error: null };
+    let tokenomics = null;
+    let buildInfo = null;
     try {
-      const [proposalResult, subnetResult] = await Promise.allSettled([
+      const [proposalResult, subnetResult, tokenomicsResult, buildInfoResult] = await Promise.allSettled([
         proposalLoader.loadOpenProposals(),
         subnetLoader.loadSubnetGroups(),
+        tokenomicsService?.loadTokenomics?.() ?? Promise.resolve(null),
+        loadBuildInfo(),
       ]);
 
       if (proposalResult.status === 'rejected') throw proposalResult.reason;
       proposals = proposalResult.value;
+      tokenomics = tokenomicsResult.status === 'fulfilled' ? tokenomicsResult.value : null;
+      buildInfo = buildInfoResult.status === 'fulfilled' ? buildInfoResult.value : null;
       if (subnetResult.status === 'fulfilled') {
         subnetPanelData = { ...subnetResult.value, error: null };
       } else {
@@ -296,7 +460,6 @@ export async function renderHomePage(root, { proposalLoader, subnetLoader }) {
     } catch {
       clear(root);
       root.append(
-        renderHeader(),
         renderNotice('Unable to load proposals accepting votes', 'The NNS Governance query failed.', load),
       );
       return;
@@ -306,12 +469,21 @@ export async function renderHomePage(root, { proposalLoader, subnetLoader }) {
     subnetPanelData = annotateSubnetsWithProposalImpacts(subnetPanelData, proposals);
     clear(root);
     const layout = document.createElement('div');
-    layout.className = 'home-layout';
+    layout.className = 'home-layout command-layout';
+    const main = document.createElement('div');
+    main.className = 'dashboard-main';
+    const reviewLink = document.createElement('a');
+    reviewLink.className = 'panel-link review-link';
+    reviewLink.href = '/review';
+    reviewLink.textContent = 'Open full review';
+    const proposalPanel = renderProposalPanel({ proposals, refreshedAt });
+    proposalPanel.prepend(reviewLink);
+    main.append(proposalPanel, renderSubnetPanel(subnetPanelData));
     layout.append(
-      renderSubnetPanel(subnetPanelData),
-      renderProposalPanel({ proposals, refreshedAt }),
+      main,
+      renderSidePanels({ proposals, subnetPanelData, tokenomics }),
     );
-    root.append(renderHeader(), layout);
+    root.append(renderHeader({ buildInfo }), renderHeroMetrics({ proposals, tokenomics }), layout);
 
     root.__proposalRefreshTimer = globalThis.setTimeout(load, PROPOSAL_AUTO_REFRESH_MS);
   }

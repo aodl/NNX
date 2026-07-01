@@ -25,6 +25,67 @@ type NodeMetricsHistoryResponse = record {
   errors : vec NodeMetricsError;
 };
 
+type HistorianError = record {
+  code : text;
+  message : text;
+};
+
+type Provenance = record {
+  source : text;
+  method : text;
+  detail : text;
+};
+
+type RewardEventSummary = record {
+  distributed_e8s_equivalent : opt nat64;
+  total_available_e8s_equivalent : opt nat64;
+  latest_round_available_e8s_equivalent : opt nat64;
+  rounds_since_last_distribution : opt nat64;
+};
+
+type TokenomicsSnapshot = record {
+  sampled_at_timestamp_seconds : nat64;
+  governance_metrics_timestamp_seconds : opt nat64;
+  total_supply_e8s : opt nat64;
+  total_maturity_e8s_equivalent : opt nat64;
+  total_staked_maturity_e8s_equivalent : opt nat64;
+  total_maturity_disbursements_in_progress_e8s_equivalent : opt nat64;
+  total_staked_e8s : opt nat64;
+  total_locked_e8s : opt nat64;
+  below_voting_threshold_staked_e8s : opt nat64;
+  min_delay_band_staked_e8s : opt nat64;
+  middle_delay_band_staked_e8s : opt nat64;
+  max_delay_band_staked_e8s : opt nat64;
+  dissolve_delay_bucket_granularity_seconds : nat64;
+  reward_event : opt RewardEventSummary;
+  icp_burned_total_e8s : opt nat64;
+  icp_burned_week_delta_e8s : opt nat64;
+  provenance : vec Provenance;
+  partial : bool;
+  errors : vec HistorianError;
+};
+
+type SampleTokenomicsSnapshotResponse = record {
+  snapshot : opt TokenomicsSnapshot;
+  partial : bool;
+  errors : vec HistorianError;
+};
+
+type TokenomicsSnapshotQuery = record {
+  start_at_timestamp_seconds : opt nat64;
+  end_at_timestamp_seconds : opt nat64;
+  limit : opt nat32;
+  cursor : opt vec nat8;
+};
+
+type TokenomicsSnapshotPage = record {
+  snapshots : vec TokenomicsSnapshot;
+  next_cursor : opt vec nat8;
+};
+
 service : {
   get_node_metrics_history : (NodeMetricsHistoryArgs) -> (NodeMetricsHistoryResponse);
+  sample_tokenomics_snapshot : () -> (SampleTokenomicsSnapshotResponse);
+  get_latest_tokenomics_snapshot : () -> (opt TokenomicsSnapshot) query;
+  list_tokenomics_snapshots : (TokenomicsSnapshotQuery) -> (TokenomicsSnapshotPage) query;
 }

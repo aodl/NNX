@@ -175,6 +175,7 @@ fn certify_all_assets() {
                 "/".to_string(),
                 "/review".to_string(),
                 "/data-sources".to_string(),
+                "/tokenomics".to_string(),
             ],
             encodings: compressed_encodings.clone(),
         },
@@ -348,6 +349,13 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     )?;
     insert_head_asset(
         &mut head_assets,
+        "/tokenomics",
+        StatusCode::OK,
+        headers_for_path("index.html", index_content_length),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
         "/base.css",
         StatusCode::OK,
         headers_for_path("base.css", base_css.contents().len()),
@@ -438,6 +446,7 @@ fn certify_not_found_assets(dir: &Dir<'static>) -> Result<(), String> {
         "/subnet/",
         "/review/",
         "/data-sources/",
+        "/tokenomics/",
     ] {
         insert_not_found_asset(
             &mut assets,
@@ -622,7 +631,12 @@ fn is_public_route(path: &str) -> bool {
     if path == "/generated/frontend-bundle.json" {
         return false;
     }
-    if path == "/" || path == "/missing" || path == "/review" || path == "/data-sources" {
+    if path == "/"
+        || path == "/missing"
+        || path == "/review"
+        || path == "/data-sources"
+        || path == "/tokenomics"
+    {
         return true;
     }
     if path == "/base.css" || path == "/logo.svg" || path == "/404" || path == "/404.html" {
@@ -689,6 +703,7 @@ fn serve_scoped_not_found(certificate: &[u8], req: &HttpRequest) -> Option<HttpR
             "/neuron/",
             "/review/",
             "/data-sources/",
+            "/tokenomics/",
         ] {
             if !path.starts_with(scope) {
                 continue;
@@ -974,6 +989,7 @@ mod tests {
             "/subnet/uuc56-gyb",
             "/review",
             "/data-sources",
+            "/tokenomics",
         ] {
             let get_response = get(path);
             let head_response = head(path);
@@ -1026,6 +1042,14 @@ mod tests {
     }
 
     #[test]
+    fn tokenomics_route_returns_index_with_200() {
+        let response = get("/tokenomics");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
     fn malformed_neuron_route_returns_404() {
         assert_eq!(
             get("/neuron/not-a-number").status_code(),
@@ -1066,6 +1090,10 @@ mod tests {
         assert_eq!(get("/review/extra").status_code(), StatusCode::NOT_FOUND);
         assert_eq!(
             get("/data-sources/extra").status_code(),
+            StatusCode::NOT_FOUND
+        );
+        assert_eq!(
+            get("/tokenomics/extra").status_code(),
             StatusCode::NOT_FOUND
         );
     }

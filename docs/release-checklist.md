@@ -64,6 +64,15 @@ Verify:
 - generated `/generated/frontend-env.json` contains the deployed
   historian/node metrics canister ID for the active network, or `null` when no
   network or explicit env var was selected during a standalone frontend build
+- `/tokenomics` returns the app shell and `/tokenomics/extra` returns 404
+- dark/light theme toggle works, persists preference, and keeps visible focus
+  rings
+- tokenomics cards show historian values when snapshots exist and the designed
+  unavailable state when snapshots do not exist
+- dissolve-delay band copy says Governance buckets have half-year granularity
+- ICP burned remains unavailable unless derived from allowed ledger/system
+  canister sources
+- no browser automation dependencies are added
 
 Manual browser smoke:
 
@@ -87,6 +96,9 @@ Manual browser smoke:
     - `/proposal/not-a-number` -> 404
     - `/neuron/not-a-number` -> 404
 16. Check browser console manually for unexpected errors.
+17. Toggle dark/light theme and refresh.
+18. Open `/tokenomics` and confirm tokenomics cards, charts, provenance badges,
+    methodology, and unavailable/partial states render.
 
 Deploy normal project builds with the repo's `icp-cli` flow. Staging upgrades may
 use `dfx` only as an operator tool against the permanent staging canisters in
