@@ -18,6 +18,16 @@ test('root routes to home', () => {
   assert.deepEqual(parseRoute('/'), { kind: 'home' });
 });
 
+test('review route', () => {
+  assert.deepEqual(parseRoute('/review'), { kind: 'review' });
+  assert.deepEqual(parseRoute('/review/extra'), { kind: 'not_found' });
+});
+
+test('data sources route', () => {
+  assert.deepEqual(parseRoute('/data-sources'), { kind: 'data_sources' });
+  assert.deepEqual(parseRoute('/data-sources/extra'), { kind: 'not_found' });
+});
+
 for (const path of [
   '/neuron/',
   '/neuron/abc',

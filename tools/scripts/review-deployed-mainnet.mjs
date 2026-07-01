@@ -7,7 +7,7 @@ import {
   createProposalAnalysisService,
   parseProposalIntent,
 } from '../../canisters/frontend/web/src/data/proposal-analysis/index.js';
-import { PROPOSAL_ISSUE_CODES } from '../../canisters/frontend/web/src/data/proposal-analysis/issue-codes.js';
+import { classifyVoteReadiness } from '../../canisters/frontend/web/src/data/proposal-analysis/vote-readiness.js';
 
 const DEFAULT_FRONTEND_URL = 'https://6h2pa-qiaaa-aaaao-qp4fa-cai.icp0.io/';
 const STAGING_HISTORIAN_ID = 'yo47z-piaaa-aaaac-qg3xa-cai';
@@ -89,26 +89,6 @@ function issueTexts(issues, severity) {
     .map((issue) => `${issue.code}: ${issue.title}`);
 }
 
-function classifyAnalysis(analysis) {
-  const unsupported = analysis.actionKind === 'Unsupported'
-    && analysis.issues.some((issue) => (
-      issue.code === PROPOSAL_ISSUE_CODES.UNSUPPORTED_PROPOSAL_ANALYSIS
-    ));
-  const misleading = analysis.issues.some((issue) => (
-    issue.lifecycle === 'pre_execution' && analysis.lifecycle !== 'pre_execution'
-  ));
-  const critical = analysis.issues.some((issue) => issue.severity === 'critical');
-  const manual = analysis.issues.some((issue) => issue.severity === 'manual_review')
-    || (analysis.dataWarnings ?? []).length > 0;
-  const parserOk = ['high', 'medium'].includes(analysis.confidence);
-
-  if (misleading) return 'misleading';
-  if (critical) return 'bug_suspected';
-  if (unsupported) return 'unsupported';
-  if (!parserOk || manual) return 'needs_manual_review';
-  return 'ready';
-}
-
 function recommendationFor(analysis, voteReadiness) {
   if (voteReadiness === 'misleading') return 'fix lifecycle';
   if (voteReadiness === 'bug_suspected') return 'fix analyzer';
@@ -121,7 +101,7 @@ function recommendationFor(analysis, voteReadiness) {
 }
 
 function reportProposal({ proposal, analysis, source }) {
-  const voteReadiness = classifyAnalysis(analysis);
+  const voteReadiness = classifyVoteReadiness(analysis);
   return {
     source,
     proposalId: proposalIdText(proposal),
@@ -129,6 +109,10 @@ function reportProposal({ proposal, analysis, source }) {
     url: `https://nns.ic0.app/proposal/?proposal=${proposalIdText(proposal)}`,
     statusKind: proposal?.statusKind ?? null,
     rewardStatusKind: proposal?.rewardStatusKind ?? null,
+    topicLabel: proposal?.topicLabel ?? null,
+    actionTypeName: proposal?.actionTypeName ?? null,
+    nnsFunctionId: proposal?.nnsFunctionId ?? null,
+    nnsFunctionName: proposal?.nnsFunctionName ?? null,
     lifecycle: analysis.lifecycle,
     actionKind: analysis.actionKind,
     parserConfidence: analysis.confidence,
@@ -142,6 +126,46 @@ function reportProposal({ proposal, analysis, source }) {
     engineeringRecommendation: recommendationFor(analysis, voteReadiness),
     rationale: `${analysis.lifecycle}; ${analysis.actionKind}; confidence ${analysis.confidence}`,
   };
+}
+
+function recommendedAnalyzerFamily({ actionTypeName, topicLabel }) {
+  const text = `${actionTypeName ?? ''} ${topicLabel ?? ''}`.toLowerCase();
+  if (/api boundary/.test(text)) return 'API-boundary';
+  if (/guestos|hostos|ssh|subnet operational|split subnet|delete subnet|version/.test(text)) return 'OS/node-admin';
+  if (/node|subnet/.test(text)) return 'node/subnet';
+  if (/governance|followee|neuron/.test(text)) return 'governance';
+  if (/sns/.test(text)) return 'SNS';
+  if (/econom/.test(text)) return 'economics';
+  if (/canister/.test(text)) return 'canister';
+  return 'other';
+}
+
+function unsupportedActionGroupsFromReports(proposals) {
+  const groups = new Map();
+  for (const proposal of proposals.filter((item) => item.voteReadiness === 'unsupported')) {
+    const key = [
+      proposal.actionTypeName ?? proposal.actionKind,
+      proposal.topicLabel ?? '',
+      proposal.nnsFunctionId ?? '',
+      proposal.nnsFunctionName ?? '',
+    ].join('|');
+    const group = groups.get(key) ?? {
+      actionTypeName: proposal.actionTypeName ?? proposal.actionKind,
+      nnsFunctionId: proposal.nnsFunctionId ?? null,
+      nnsFunctionName: proposal.nnsFunctionName ?? null,
+      topicLabel: proposal.topicLabel ?? null,
+      openCount: 0,
+      exampleProposalIds: [],
+      recommendedAnalyzerFamily: recommendedAnalyzerFamily(proposal),
+    };
+    if (proposal.source === 'changed_open') group.openCount += 1;
+    if (group.exampleProposalIds.length < 5) group.exampleProposalIds.push(proposal.proposalId);
+    groups.set(key, group);
+  }
+  return [...groups.values()].sort((left, right) => {
+    if (right.openCount !== left.openCount) return right.openCount - left.openCount;
+    return left.actionTypeName.localeCompare(right.actionTypeName);
+  });
 }
 
 async function sampleRecentTerminalProposals({ queryFacade, openProposals, limit = DEFAULT_TERMINAL_SAMPLE_LIMIT }) {
@@ -163,7 +187,7 @@ async function sampleRecentTerminalProposals({ queryFacade, openProposals, limit
   return samples;
 }
 
-function markdownReport({ frontendUrl, buildInfo, frontendEnv, routes, proposals }) {
+function markdownReport({ frontendUrl, buildInfo, frontendEnv, routes, proposals, unsupportedActionGroups }) {
   const lines = [
     '# NNX deployed mainnet review',
     '',
@@ -213,6 +237,14 @@ function markdownReport({ frontendUrl, buildInfo, frontendEnv, routes, proposals
       }
     }
   }
+  lines.push('', '## Unsupported action groups', '');
+  if (unsupportedActionGroups.length === 0) {
+    lines.push('No unsupported action groups in reviewed proposals.');
+  } else {
+    for (const group of unsupportedActionGroups) {
+      lines.push(`- ${group.actionTypeName}: ${group.openCount} open; topic ${group.topicLabel ?? 'unknown'}; function ${group.nnsFunctionName ?? group.nnsFunctionId ?? 'unknown'}; examples ${group.exampleProposalIds.join(', ')}; recommended family ${group.recommendedAnalyzerFamily}`);
+    }
+  }
   return `${lines.join('\n')}\n`;
 }
 
@@ -245,6 +277,10 @@ const routes = await Promise.all([
   '/proposal/not-a-number',
   '/neuron/not-a-number',
   '/subnet/not-a-principal',
+  '/review',
+  '/review/extra',
+  '/data-sources',
+  '/data-sources/extra',
 ].map((route) => routeStatus(frontendUrl, route)));
 
 const backend = await createAgentQueryBackend({
@@ -290,6 +326,7 @@ const jsonReport = {
   changedOpenProposalCount: changed.length,
   terminalSampleCount: terminalSamples.length,
   proposals,
+  unsupportedActionGroups: unsupportedActionGroupsFromReports(proposals),
 };
 
 await mkdir(path.dirname(stateFile), { recursive: true });
@@ -302,6 +339,7 @@ await writeFile(outFile, markdownReport({
   frontendEnv,
   routes,
   proposals,
+  unsupportedActionGroups: jsonReport.unsupportedActionGroups,
 }));
 
 console.log(`Review written to ${outFile}`);

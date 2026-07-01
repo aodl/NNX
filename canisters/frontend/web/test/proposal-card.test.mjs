@@ -148,16 +148,19 @@ test('proposal card timeline bar uses elapsed deadline progress percent', () => 
   assert.equal(fill.className, 'countdown-fill warning');
 }));
 
-test('proposal card shows vote acceptance instead of execution status', () => withTestDocument(() => {
+test('proposal card renders decision status before reward voting status', () => withTestDocument(() => {
   const proposal = proposalWithTally(null);
   proposal.statusKind = 'executed';
   proposal.statusLabel = 'Executed';
 
   const card = renderProposalCard(proposal);
-  const status = card.querySelector('.proposal-status');
+  const statuses = card.querySelectorAll('.proposal-status');
 
-  assert.equal(status.textContent, 'Accepting votes');
-  assert.equal(status.className, 'proposal-status accepting-votes');
+  assert.equal(statuses[0].textContent, 'Executed');
+  assert.equal(statuses[0].className, 'proposal-status decision executed');
+  assert.equal(statuses[1].textContent, 'Accepting votes');
+  assert.equal(statuses[1].className, 'proposal-status reward accepting-votes');
+  assert.match(card.getTextContent(), /Decision made; still accepting reward votes/);
 }));
 
 test('timeline progress bar uses elapsed deadline progress percent', () => withTestDocument(() => {

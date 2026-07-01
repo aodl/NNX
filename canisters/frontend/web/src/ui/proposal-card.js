@@ -1,6 +1,8 @@
 import {
   formatTimeRemaining,
 } from '../app/view-formatters.js';
+import { proposalStatusDisplay } from '../data/proposal-analysis/status-display.js';
+import { classifyVoteReadiness, readinessLabel } from '../data/proposal-analysis/vote-readiness.js';
 import { renderAnalysisBadges, renderTopIssueTitles } from './proposal-analysis-panel.js';
 import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 
@@ -96,18 +98,38 @@ export function renderProposalCard(proposal) {
   title.className = 'proposal-title';
   title.textContent = proposal.title;
 
+  const statusDisplay = proposalStatusDisplay(proposal);
+  const statusWrap = document.createElement('div');
+  statusWrap.className = 'proposal-status-stack';
+
   const status = document.createElement('span');
-  status.className = `proposal-status ${proposal.rewardStatusKind ?? proposal.statusKind ?? 'unknown'}`;
-  status.textContent = proposal.rewardStatusLabel ?? proposal.statusLabel ?? 'Unknown';
+  status.className = `proposal-status decision ${statusDisplay.decisionStatusKind}`;
+  status.textContent = statusDisplay.decisionStatusLabel;
+
+  const rewardStatus = document.createElement('span');
+  rewardStatus.className = `proposal-status reward ${statusDisplay.rewardStatusKind}`;
+  rewardStatus.textContent = statusDisplay.rewardStatusLabel;
+  statusWrap.append(status, rewardStatus);
+
+  if (statusDisplay.decisionMadeStillAcceptingRewardVotes) {
+    const note = document.createElement('span');
+    note.className = 'proposal-status-note';
+    note.textContent = 'Decision made; still accepting reward votes.';
+    statusWrap.append(note);
+  }
 
   const metrics = document.createElement('div');
   metrics.className = 'proposal-card-metrics';
   metrics.append(renderVoteSplit(proposal.tally), renderCountdown(proposal));
 
-  heading.append(title, status);
+  heading.append(title, statusWrap);
   card.append(heading, metrics);
   if (proposal.analysis) {
-    card.append(renderAnalysisBadges(proposal.analysis), renderTopIssueTitles(proposal.analysis));
+    const readiness = classifyVoteReadiness(proposal.analysis);
+    const readinessChip = document.createElement('span');
+    readinessChip.className = `readiness-chip ${readiness}`;
+    readinessChip.textContent = readinessLabel(readiness);
+    card.append(readinessChip, renderAnalysisBadges(proposal.analysis), renderTopIssueTitles(proposal.analysis));
   }
   return card;
 }

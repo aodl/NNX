@@ -171,7 +171,11 @@ fn certify_all_assets() {
                     status_code: Some(StatusCode::OK),
                 },
             ],
-            aliased_by: vec!["/".to_string()],
+            aliased_by: vec![
+                "/".to_string(),
+                "/review".to_string(),
+                "/data-sources".to_string(),
+            ],
             encodings: compressed_encodings.clone(),
         },
         AssetConfig::File {
@@ -319,6 +323,20 @@ fn certify_head_assets(dir: &Dir<'static>) -> Result<(), String> {
     )?;
     insert_head_asset(
         &mut head_assets,
+        "/review",
+        StatusCode::OK,
+        headers_for_path("index.html", index_content_length),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
+        "/data-sources",
+        StatusCode::OK,
+        headers_for_path("index.html", index_content_length),
+        HeadAssetMatchKind::Exact,
+    )?;
+    insert_head_asset(
+        &mut head_assets,
         "/base.css",
         StatusCode::OK,
         headers_for_path("base.css", base_css.contents().len()),
@@ -396,7 +414,13 @@ fn certify_not_found_assets(dir: &Dir<'static>) -> Result<(), String> {
         .get_file("404.html")
         .ok_or_else(|| "404.html is missing from frontend assets".to_string())?;
     let mut assets = HashMap::new();
-    for scope in ["/neuron/", "/proposal/", "/subnet/"] {
+    for scope in [
+        "/neuron/",
+        "/proposal/",
+        "/subnet/",
+        "/review/",
+        "/data-sources/",
+    ] {
         insert_not_found_asset(
             &mut assets,
             scope,
@@ -580,7 +604,7 @@ fn is_public_route(path: &str) -> bool {
     if path == "/generated/frontend-bundle.json" {
         return false;
     }
-    if path == "/" || path == "/missing" {
+    if path == "/" || path == "/missing" || path == "/review" || path == "/data-sources" {
         return true;
     }
     if path == "/base.css" || path == "/404" || path == "/404.html" {
@@ -641,7 +665,13 @@ fn not_found_response(certificate: &[u8], req: &HttpRequest) -> HttpResponse<'st
 fn serve_scoped_not_found(certificate: &[u8], req: &HttpRequest) -> Option<HttpResponse<'static>> {
     let path = req.get_path().ok()?;
     NOT_FOUND_ASSETS.with_borrow(|not_found_assets| {
-        for scope in ["/subnet/", "/proposal/", "/neuron/"] {
+        for scope in [
+            "/subnet/",
+            "/proposal/",
+            "/neuron/",
+            "/review/",
+            "/data-sources/",
+        ] {
             if !path.starts_with(scope) {
                 continue;
             }
@@ -922,6 +952,8 @@ mod tests {
             "/neuron/2947465672511369",
             "/proposal/2947465672511369",
             "/subnet/uuc56-gyb",
+            "/review",
+            "/data-sources",
         ] {
             let get_response = get(path);
             let head_response = head(path);
@@ -952,6 +984,22 @@ mod tests {
     #[test]
     fn subnet_route_returns_index_with_200() {
         let response = get("/subnet/uuc56-gyb");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn review_route_returns_index_with_200() {
+        let response = get("/review");
+        assert_eq!(response.status_code(), StatusCode::OK);
+        assert_eq!(header_value(&response, "content-type"), Some("text/html"));
+        assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
+    }
+
+    #[test]
+    fn data_sources_route_returns_index_with_200() {
+        let response = get("/data-sources");
         assert_eq!(response.status_code(), StatusCode::OK);
         assert_eq!(header_value(&response, "content-type"), Some("text/html"));
         assert!(String::from_utf8_lossy(response.body()).contains("Network Nexus"));
@@ -989,6 +1037,15 @@ mod tests {
         );
         assert_eq!(
             get("/subnet/uuc56-gyb/extra").status_code(),
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn malformed_static_spa_routes_return_404() {
+        assert_eq!(get("/review/extra").status_code(), StatusCode::NOT_FOUND);
+        assert_eq!(
+            get("/data-sources/extra").status_code(),
             StatusCode::NOT_FOUND
         );
     }

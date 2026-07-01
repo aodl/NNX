@@ -9,7 +9,9 @@ import { renderHomePage } from '../ui/home-page.js';
 import { renderNeuronPage } from '../ui/neuron-page.js';
 import { renderNotFoundPage } from '../ui/not-found-page.js';
 import { renderProposalPage } from '../ui/proposal-page.js';
+import { renderReviewPage } from '../ui/review-page.js';
 import { renderSubnetPage } from '../ui/subnet-page.js';
+import { renderDataSourcesPage } from '../ui/data-sources-page.js';
 
 async function createQueryFacade(windowRef) {
   const hostname = windowRef.location.hostname;
@@ -50,6 +52,17 @@ export async function bootstrap({ windowRef = window, documentRef = document } =
     const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
     const subnetLoader = createSubnetLoader({ queryFacade });
     await renderProposalPage(root, { proposalId: route.proposalId, proposalLoader, subnetLoader });
+    return;
+  }
+
+  if (route.kind === 'review') {
+    const proposalLoader = createProposalLoader({ queryFacade: analysisFacade });
+    await renderReviewPage(root, { proposalLoader });
+    return;
+  }
+
+  if (route.kind === 'data_sources') {
+    await renderDataSourcesPage(root);
     return;
   }
 

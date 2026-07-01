@@ -1,0 +1,38 @@
+{
+  "capturedAt": "2026-07-01T21:55:38.118Z",
+  "source": "NNS Governance via NNX query facade",
+  "proposalId": "142651",
+  "topicId": 12,
+  "topicLabel": "IC OS Version Deployment",
+  "status": 4,
+  "statusKind": "executed",
+  "statusLabel": "Executed",
+  "rewardStatus": 1,
+  "rewardStatusKind": "accepting-votes",
+  "rewardStatusLabel": "Accepting votes",
+  "actionTypeName": "Deploy GuestOS To Some API Boundary Nodes",
+  "actionDescription": "Update the version of a set of API Boundary Nodes.",
+  "actionDetails": null,
+  "actionValues": [
+    {
+      "name": "node_ids",
+      "value": "i55je-j5vzn-z4odr-yhmrb-nlf46-gbgfg-6uk5e-gssxu-b7hmf-ntlay-pqe"
+    },
+    {
+      "name": "version",
+      "value": "feb8e5f205ad5577b2e11e56a6f94faa2d1c6116"
+    }
+  ],
+  "payloadSummary": "ExecuteNnsFunction\ntype_description\nUpdate the version of a set of API Boundary Nodes.\ntype_name\nDeploy GuestOS To Some API Boundary Nodes\nvalue\nMap\nnode_ids\nArray\nText\ni55je-j5vzn-z4odr-yhmrb-nlf46-gbgfg-6uk5e-gssxu-b7hmf-ntlay-pqe\nversion\nText\nfeb8e5f205ad5577b2e11e56a6f94faa2d1c6116",
+  "parsedIntent": {
+    "actionKind": "Unsupported",
+    "confidence": "unsupported",
+    "targetSubnetId": null,
+    "referencedSubnetIds": [],
+    "addNodeIds": [],
+    "removeNodeIds": [],
+    "isApiBoundaryAction": false,
+    "createsNewSubnet": false,
+    "parseWarnings": []
+  }
+}

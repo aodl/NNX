@@ -8,10 +8,12 @@ import {
   mergeNodeLocationsByNodeId,
 } from '../data/proposal-node-impacts.js';
 import { referencedSubnetsForProposal } from '../data/proposal-subnet-impacts.js';
+import { proposalStatusDisplay } from '../data/proposal-analysis/status-display.js';
 import { groupNodeLocations } from '../data/subnet-loader.js';
 import { renderNotFoundPage } from './not-found-page.js';
 import { renderNodeGlobePanel } from './node-globe-panel.js';
 import { renderProposalAnalysisPanel } from './proposal-analysis-panel.js';
+import { lifecycleLabel } from './labels.js';
 import { renderSubnetSummaryPanel } from './subnet-summary-panel.js';
 import { renderTimelineBar, renderVotePowerBar } from './vote-bar.js';
 import { safeExternalUrl } from '../security/safe-url.js';
@@ -163,6 +165,40 @@ function visualSection(title, iconName, body) {
   return section;
 }
 
+function statusStripItem(label, value, className = '') {
+  const item = document.createElement('div');
+  item.className = `proposal-status-strip-item ${className}`.trim();
+  const term = document.createElement('span');
+  term.textContent = label;
+  const description = document.createElement('strong');
+  description.textContent = value ?? 'Unavailable';
+  item.append(term, description);
+  return item;
+}
+
+function renderStatusStrip(proposal) {
+  const display = proposalStatusDisplay(proposal);
+  const strip = document.createElement('section');
+  strip.className = 'proposal-status-strip';
+  strip.append(
+    statusStripItem('Decision status', display.decisionStatusLabel, `decision ${display.decisionStatusKind}`),
+    statusStripItem('Reward/voting status', display.rewardStatusLabel, `reward ${display.rewardStatusKind}`),
+    statusStripItem('Lifecycle mode', lifecycleLabel(display.lifecycle)),
+    statusStripItem('Reward voting deadline', formatTimeRemaining(proposal.deadlineTimestampSeconds)),
+  );
+  const help = document.createElement('p');
+  help.className = 'proposal-status-help';
+  help.textContent = 'Reward voting can continue after a proposal has already been adopted/rejected/executed.';
+  strip.append(help);
+  if (display.decisionMadeStillAcceptingRewardVotes) {
+    const note = document.createElement('p');
+    note.className = 'proposal-status-note';
+    note.textContent = 'Decision made; still accepting reward votes.';
+    strip.append(note);
+  }
+  return strip;
+}
+
 function votePercentLabel(kind, label, percent) {
   const item = document.createElement('span');
   item.className = `proposal-vote-label ${kind}`;
@@ -282,9 +318,10 @@ function renderProposalDetails(
   if (subtitleLink instanceof Node) {
     subtitleLink.className = 'proposal-detail-subtitle-link';
   }
+  const display = proposalStatusDisplay(proposal);
   const status = document.createElement('span');
-  status.className = `proposal-status ${proposal.statusKind ?? 'unknown'}`;
-  status.textContent = proposal.statusLabel ?? 'Unknown';
+  status.className = `proposal-status decision ${display.decisionStatusKind}`;
+  status.textContent = display.decisionStatusLabel;
   const meta = document.createElement('div');
   meta.className = 'proposal-detail-meta';
   meta.append(
@@ -332,7 +369,7 @@ function renderProposalDetails(
     actionExtra.push(warning);
   }
 
-  shell.append(back, header, visuals);
+  shell.append(back, header, renderStatusStrip(proposal), visuals);
   shell.append(renderProposalAnalysisPanel(proposal.analysis));
   if (subnetLoadError) {
     shell.append(renderSubnetLoadWarningPanel());

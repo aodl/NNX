@@ -11,6 +11,14 @@ export function parseRoute(pathname) {
     return { kind: 'home' };
   }
 
+  if (pathname === '/review') {
+    return { kind: 'review' };
+  }
+
+  if (pathname === '/data-sources') {
+    return { kind: 'data_sources' };
+  }
+
   const parts = pathname.split('/').filter(Boolean);
   if (parts.length !== 2 || !['neuron', 'proposal', 'subnet'].includes(parts[0])) {
     return { kind: 'not_found' };

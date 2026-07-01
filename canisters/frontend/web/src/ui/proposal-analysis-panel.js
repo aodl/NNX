@@ -1,4 +1,12 @@
 import { groupIssuesBySeverity } from '../data/proposal-analysis/proposal-analysis-types.js';
+import {
+  classifyVoteReadiness,
+  readinessDescription,
+  readinessLabel,
+  recommendedReviewerAction,
+} from '../data/proposal-analysis/vote-readiness.js';
+import { lifecycleLabel, severityLabel } from './labels.js';
+import { issueCountChips, miniDeltaTable, sourceBadge } from './widgets.js';
 
 function chip(text, kind = '') {
   const item = document.createElement('span');
@@ -34,10 +42,19 @@ export function renderTopIssueTitles(analysis, limit = 2) {
 
 function issueList(title, issues) {
   if (!issues.length) return null;
-  const section = document.createElement('section');
+  const isCollapsible = title === 'Informational findings';
+  const section = document.createElement(isCollapsible ? 'details' : 'section');
   section.className = 'analysis-issue-group';
-  const h3 = document.createElement('h3');
-  h3.textContent = title;
+  if (isCollapsible) {
+    section.open = false;
+    const summary = document.createElement('summary');
+    summary.textContent = title;
+    section.append(summary);
+  } else {
+    const h3 = document.createElement('h3');
+    h3.textContent = title;
+    section.append(h3);
+  }
   const list = document.createElement('ul');
   for (const issue of issues) {
     const item = document.createElement('li');
@@ -45,21 +62,11 @@ function issueList(title, issues) {
     strong.textContent = issue.title;
     const message = document.createElement('span');
     message.textContent = issue.message ? ` ${issue.message}` : '';
-    item.append(strong, message);
+    item.append(strong, message, issueExplanation(issue));
     list.append(item);
   }
-  section.append(h3, list);
+  section.append(list);
   return section;
-}
-
-function lifecycleLabel(lifecycle) {
-  return {
-    pre_execution: 'pre-execution',
-    post_execution_success: 'post-execution',
-    post_execution_failed: 'failed/rejected',
-    rejected: 'failed/rejected',
-    unknown: 'unknown',
-  }[lifecycle] ?? 'unknown';
 }
 
 function confidenceNotice(confidence) {
@@ -77,8 +84,14 @@ function confidenceNotice(confidence) {
 }
 
 function nodeList(title, nodeIds) {
-  const row = document.createElement('div');
+  const isCollapsible = (nodeIds?.length ?? 0) > 10;
+  const row = document.createElement(isCollapsible ? 'details' : 'div');
   row.className = 'analysis-node-list';
+  if (isCollapsible) {
+    const summary = document.createElement('summary');
+    summary.textContent = `${title}: ${nodeIds.length} nodes`;
+    row.append(summary);
+  }
   const label = document.createElement('span');
   label.textContent = title;
   const value = document.createElement('strong');
@@ -96,6 +109,136 @@ function metricLine(label, before, after) {
   value.textContent = `${before} -> ${after}`;
   row.append(name, value);
   return row;
+}
+
+function issueExplanation(issue) {
+  const explanations = {
+    REMOVE_NODE_HAS_NO_ELEVATED_FAILURE_SIGNAL: 'NNX did not observe an elevated block-production failure signal in the selected historian window. This does not prove the node is healthy; it means this specific measured signal does not support removal.',
+    NODE_METRICS_UNAVAILABLE: 'Historian node metrics were unavailable or unsupported for this query. Reviewers should not infer node health from this missing data.',
+    REGISTRY_VERSION_INCONSISTENT: 'Some Registry records were read from different Registry versions. NNX treats the analysis as partial because topology may have changed between reads.',
+    API_BOUNDARY_REMOVE_NODE_NOT_API_BOUNDARY: 'Certified state did not show this node as an API boundary node. If this proposal is pre-execution, removal may be redundant or based on information NNX cannot observe.',
+    UNSUPPORTED_PROPOSAL_ANALYSIS: 'NNX has not implemented a deterministic analyzer for this action type yet. Use the proposal payload and linked supporting material manually.',
+  };
+  const text = explanations[issue?.code];
+  if (!text) {
+    const empty = document.createElement('span');
+    empty.className = 'issue-explanation empty';
+    return empty;
+  }
+  const note = document.createElement('p');
+  note.className = 'issue-explanation';
+  note.textContent = text;
+  return note;
+}
+
+function field(label, value) {
+  const row = document.createElement('div');
+  row.className = 'readiness-field';
+  const term = document.createElement('span');
+  term.textContent = label;
+  const description = document.createElement('strong');
+  description.textContent = value ?? 'Unavailable';
+  row.append(term, description);
+  return row;
+}
+
+function supportedActionLabel(analysis) {
+  if (!analysis) return 'Unavailable';
+  if (analysis.actionKind === 'Unsupported') return 'No';
+  return 'Yes';
+}
+
+export function renderVoteReadinessPanel(analysis, proposal = null) {
+  const section = document.createElement('section');
+  section.className = 'vote-readiness-panel';
+  const title = document.createElement('h2');
+  title.textContent = 'Vote readiness';
+  section.append(title);
+
+  if (!analysis) {
+    const empty = document.createElement('p');
+    empty.className = 'muted';
+    empty.textContent = 'Vote readiness is unavailable.';
+    section.append(empty);
+    return section;
+  }
+
+  const readiness = classifyVoteReadiness(analysis);
+  const chip = document.createElement('span');
+  chip.className = `readiness-chip ${readiness}`;
+  chip.textContent = readinessLabel(readiness);
+
+  const description = document.createElement('p');
+  description.className = 'proposal-detail-note';
+  description.textContent = readinessDescription(readiness);
+
+  const grid = document.createElement('div');
+  grid.className = 'readiness-grid';
+  grid.append(
+    field('Readiness', readinessLabel(readiness)),
+    field('Lifecycle', lifecycleLabel(analysis.lifecycle)),
+    field('Parser confidence', severityLabel(analysis.confidence)),
+    field('Supported action', supportedActionLabel(analysis)),
+    field('Critical', analysis.summary.criticalCount),
+    field('Warnings', analysis.summary.warningCount),
+    field('Manual review', analysis.summary.manualReviewCount),
+    field('Info', analysis.summary.infoCount),
+    field('Data warnings', (analysis.dataWarnings ?? []).length),
+    field('Recommended reviewer action', recommendedReviewerAction(analysis, readiness)),
+  );
+
+  section.append(chip, description, grid);
+
+  if (analysis.actionKind === 'Unsupported') {
+    const unsupported = document.createElement('div');
+    unsupported.className = 'unsupported-action-panel';
+    const h3 = document.createElement('h3');
+    h3.textContent = 'Unsupported action details';
+    unsupported.append(
+      h3,
+      field('Action type', proposal?.actionTypeName ?? analysis.intent?.actionTypeName ?? 'Unsupported'),
+      field('Topic', proposal?.topicLabel ?? 'Unavailable'),
+      field('NNS function', proposal?.nnsFunctionName ?? proposal?.nnsFunctionId ?? 'Unavailable'),
+      field('What NNX can still show', 'Proposal metadata, normalized payload fields, lifecycle, vote tally, and onchain evidence that existing boundaries can load.'),
+      field('What NNX cannot yet validate', 'A deterministic action-specific precondition or postcondition check.'),
+      field('Fixture capture', `node tools/scripts/capture-proposal-fixture.mjs ${analysis.proposalId ?? proposal?.id ?? '<proposal-id>'}`),
+    );
+    section.append(unsupported);
+  }
+
+  return section;
+}
+
+function renderEvidenceChecklist(analysis) {
+  const section = document.createElement('section');
+  section.className = 'evidence-checklist';
+  const h3 = document.createElement('h3');
+  h3.textContent = 'Evidence checklist';
+  const list = document.createElement('ul');
+  const hasNodes = (analysis.stateChange?.currentNodeIds?.length ?? 0) > 0
+    || (analysis.stateChange?.beforeNodeIds?.length ?? 0) > 0
+    || (analysis.stateChange?.afterNodeIds?.length ?? 0) > 0;
+  const checks = [
+    ['Governance proposal loaded', true, 'Governance'],
+    ['Supported action parser loaded', analysis.actionKind !== 'Unsupported', 'Governance'],
+    ['Target subnet known when applicable', Boolean(analysis.intent?.targetSubnetId), 'Registry'],
+    ['Current subnet membership loaded when applicable', hasNodes, 'Registry'],
+    ['Node records loaded when applicable', hasNodes, 'Registry'],
+    ['Node provider/operator/data-center loaded when applicable', Boolean(analysis.metrics?.diversity), 'Registry'],
+    ['CMC labels loaded when applicable', true, 'CMC'],
+    ['Node metrics loaded or typed unavailable', Boolean(analysis.metrics?.nodeHealth) || analysis.issues.some((issue) => issue.code === 'NODE_METRICS_UNAVAILABLE'), 'Historian / node metrics'],
+    ['Open proposal conflicts checked', true, 'Governance'],
+    ['Certified API-boundary membership available when applicable', analysis.actionKind?.includes('ApiBoundary') ? analysis.issues.every((issue) => issue.code !== 'API_BOUNDARY_MEMBERSHIP_UNAVAILABLE') : true, 'Certified state'],
+    ['API-boundary metrics intentionally not used', true, 'Certified state'],
+  ];
+  for (const [label, ok, source] of checks) {
+    const item = document.createElement('li');
+    item.textContent = `${ok ? 'Available' : 'Missing'}: ${label} `;
+    item.append(sourceBadge(source));
+    list.append(item);
+  }
+  section.append(h3, list);
+  return section;
 }
 
 export function renderProposalAnalysisPanel(analysis) {
@@ -117,11 +260,13 @@ export function renderProposalAnalysisPanel(analysis) {
     return section;
   }
 
+  section.append(renderVoteReadinessPanel(analysis));
   const groups = groupIssuesBySeverity(analysis.issues);
   const lifecycle = document.createElement('div');
   lifecycle.className = 'analysis-lifecycle-mode';
   lifecycle.textContent = `Lifecycle mode: ${lifecycleLabel(analysis.lifecycle)}`;
   section.append(lifecycle);
+  section.append(issueCountChips(analysis.summary), renderEvidenceChecklist(analysis));
   const parserNote = confidenceNotice(analysis.confidence);
   if (parserNote) section.append(parserNote);
   for (const group of [
@@ -137,12 +282,29 @@ export function renderProposalAnalysisPanel(analysis) {
   state.className = 'analysis-state';
   const stateTitle = document.createElement('h3');
   stateTitle.textContent = 'State change';
-  state.append(
-    stateTitle,
-    metricLine('Nodes', analysis.stateChange.beforeNodeIds.length, analysis.stateChange.afterNodeIds.length),
-    nodeList('Added', analysis.stateChange.addedNodeIds),
-    nodeList('Removed', analysis.stateChange.removedNodeIds),
-  );
+  state.append(stateTitle, miniDeltaTable([
+    {
+      item: 'Node count',
+      before: analysis.stateChange.beforeNodeIds.length,
+      after: analysis.stateChange.afterNodeIds.length,
+      delta: analysis.stateChange.afterNodeIds.length - analysis.stateChange.beforeNodeIds.length,
+      source: sourceBadge('Registry'),
+    },
+    {
+      item: 'Added nodes',
+      before: 0,
+      after: analysis.stateChange.addedNodeIds.length,
+      delta: analysis.stateChange.addedNodeIds.length,
+      source: sourceBadge('Registry'),
+    },
+    {
+      item: 'Removed nodes',
+      before: analysis.stateChange.removedNodeIds.length,
+      after: 0,
+      delta: -analysis.stateChange.removedNodeIds.length,
+      source: sourceBadge('Registry'),
+    },
+  ]), nodeList('Added', analysis.stateChange.addedNodeIds), nodeList('Removed', analysis.stateChange.removedNodeIds));
   section.append(state);
 
   const diversity = analysis.metrics.diversity;
@@ -168,11 +330,6 @@ export function renderProposalAnalysisPanel(analysis) {
     }
     section.append(decentralisation);
   }
-
-  const explanation = document.createElement('p');
-  explanation.className = 'proposal-detail-note';
-  explanation.textContent = 'Why this matters: these checks highlight onchain evidence that may affect subnet decentralisation, proposal intent, or manual review needs.';
-  section.append(explanation);
 
   return section;
 }
